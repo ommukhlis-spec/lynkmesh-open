@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lynkmesh"
+version = "0.1.0a0"
+description = "Open-core deterministic code graph foundation for legacy codebases."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [
+  { name = "LynkMesh contributors" }
+]
+keywords = [
+  "code-graph",
+  "static-analysis",
+  "legacy-code",
+  "incremental-analysis",
+  "software-architecture"
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Libraries",
+  "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+]
+
+[tool.setuptools.packages.find]
+include = ["lynkmesh*"]
+exclude = ["test*", "private_tests*", "devtools*"]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+python_files = ["test_*.py"]

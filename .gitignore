@@ -1,0 +1,179 @@
+# ============================================================
+# PYTHON
+# ============================================================
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# ============================================================
+# PYTHON ENV / PACKAGE ARTIFACTS
+# ============================================================
+
+.venv/
+venv/
+env/
+ENV/
+
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# ============================================================
+# PYTEST / COVERAGE / TYPE CHECKING
+# ============================================================
+
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+
+# ============================================================
+# LOCAL AI / IDE
+# ============================================================
+
+.claude/
+.vscode/
+.idea/
+.cursor/
+.windsurf/
+
+# ============================================================
+# MCP LOCAL DEBUG / DEV ARTIFACTS
+# ============================================================
+
+mcp_smoke_test.py
+mcp_debug*.py
+mcp_*.log
+
+# ============================================================
+# LEGACY / TRANSITION
+# ============================================================
+
+legacy/
+
+# ============================================================
+# LOGS
+# ============================================================
+
+*.log
+log.txt
+run1.log
+run2.log
+run3.log
+seeded_run1.log
+seeded_run2.log
+seeded_run3.log
+
+# ============================================================
+# DEBUG ARTIFACTS
+# ============================================================
+
+propagation_debug.json
+debug_export.json
+debug_*.json
+*_debug.json
+trace_*.json
+
+# ============================================================
+# GENERATED EXPORTS / CACHE OUTPUTS
+# ============================================================
+
+contextforge_export.json
+lynkmesh_export.json
+graph_export.json
+graph_cache.json
+*.cache
+*.sqlite
+*.sqlite3
+.cache/
+cache/
+
+# ============================================================
+# ENV / LOCAL CONFIG
+# ============================================================
+
+.env
+.env.*
+.env.local
+.envrc
+
+setup_local_env.bat
+local_config.py
+config.local.py
+
+# ============================================================
+# OS FILES
+# ============================================================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============================================================
+# TEMP / CACHE
+# ============================================================
+
+tmp/
+temp/
+.tmp/
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# ============================================================
+# NODE / NPX LOCAL ARTIFACTS
+# ============================================================
+
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ============================================================
+# OPTIONAL EXPERIMENTAL FILES
+# ============================================================
+
+probe.py
+inspect_*.py
+
+# ============================================================
+# RANDOM ARTIFACTS
+# ============================================================
+
+None
+dict
+
+# ============================================================
+# OPTIONAL PLACEHOLDER FILES
+# Uncomment if needed later
+# ============================================================
+
+# cli.py
+# analysis/concept_engine.py
+# pipeline/cache_manager.py
+# pipeline/context.py
+# core/model_registry.py
+
+# ============================================================
+# PRO / PRIVATE R&D MODULES
+# ============================================================
+
+core/incremental_diff.py
+core/graph_cache.py
+
+test/unit/core/test_incremental_diff.py
+test/integration/test_incremental_diff_integration.py
+test/unit/core/test_graph_cache.py
+test/integration/test_pipeline_baseline.py
+
+devtools/
