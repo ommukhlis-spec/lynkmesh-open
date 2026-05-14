@@ -1,0 +1,40 @@
+name: LynkMesh X Scheduler
+
+on:
+  schedule:
+    # Post setiap hari jam 09:00 WIB (02:00 UTC)
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Biar lo bisa klik tombol "Run" manual buat ngetes
+
+jobs:
+  tweet:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Wajib supaya bot bisa update file JSON setelah posting
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: pip install tweepy
+
+      - name: Run Tweet Script
+        env:
+          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
+          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_TOKEN_SECRET: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}
+        run: python scripts/tweet_worker.py
+
+      - name: Commit Changes
+        run: |
+          git config --global user.name "LynkMesh-Bot"
+          git config --global user.email "bot@lynkmesh.ai"
+          git add content/posts.json
+          git commit -m "Update post queue [skip ci]" || echo "No changes to commit"
+          git push
