@@ -2,8 +2,11 @@ name: LynkMesh X Scheduler
 
 on:
   schedule:
-    - cron: '0 2 * * *' # Jam 9 Pagi WIB
-  workflow_dispatch: # Biar bisa tes manual
+    - cron: '0 2 * * *' # Jalan otomatis jam 9 pagi WIB
+  workflow_dispatch: # Tombol manual untuk ngetes
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   tweet:
