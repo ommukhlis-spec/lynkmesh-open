@@ -5,19 +5,24 @@ call resolution, enrichment, and validation. This is the central conductor.
 """
 
 import logging
+import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 
 from lynkmesh.ingestion.parser_engine import ParserEngine
 from lynkmesh.ingestion.ir_normalizer import IRNormalizer
 from lynkmesh.graph.graph_builder import GraphBuilder
-from lynkmesh.graph.call_resolver import CallResolver  # 🔥 Kembali ke file monolitik
+from lynkmesh.graph.call_resolver import CallResolver
 from lynkmesh.graph.graph_enricher import GraphEnricher
 from lynkmesh.graph.graph_validator import GraphValidator
 from lynkmesh.core.graph_core import GraphCore
 from lynkmesh.core.graph_version import verify_pipeline_determinism
 
 logger = logging.getLogger(__name__)
+
+# Stage 4.2.3 – callback type for internal sub‑phase timing
+PhaseCallback = Callable[[str, str, float], None]
 
 
 class Orchestrator:
@@ -39,6 +44,8 @@ class Orchestrator:
         max_workers: int = 4,
         enable_http_enrichment: bool = True,
         export_propagation_debug: Optional[str] = None,
+        *,
+        on_phase: Optional[PhaseCallback] = None,
     ):
         """
         Args:
@@ -46,10 +53,10 @@ class Orchestrator:
             max_workers: Number of parallel parser workers
             enable_http_enrichment: Whether to run GraphEnricher for HTTP/route linking
             export_propagation_debug: If set, export CallResolver propagation debug to this file
+            on_phase: optional callback for internal sub‑phase timing diagnostics
+                (name, event, elapsed_seconds). Never breaks pipeline.
         """
         # Stage 3.0.0 — verify PYTHONHASHSEED=0 before any pipeline run.
-        # Raises EnvironmentError if seed is missing or wrong; this is the
-        # earliest point we can fail-fast on a misconfigured environment.
         verify_pipeline_determinism()
 
         self.use_parallel = use_parallel_parsing
@@ -57,6 +64,18 @@ class Orchestrator:
         self.enable_http_enrichment = enable_http_enrichment
         self.export_propagation_debug = export_propagation_debug
         self.resolver: Optional[CallResolver] = None
+        self._on_phase = on_phase
+        self._phase_timings: Dict[str, float] = {}
+        self._last_parser_diagnostics: Optional[Dict[str, Any]] = None
+
+    @property
+    def last_parser_diagnostics(self) -> Optional[Dict[str, Any]]:
+        """Return the diagnostics captured from the most recent ParserEngine run, if any."""
+        return self._last_parser_diagnostics
+
+    def set_phase_callback(self, on_phase: Optional[PhaseCallback]) -> None:
+        """Attach or clear the phase callback used during the next run."""
+        self._on_phase = on_phase
 
     @property
     def last_resolution_telemetry(self):
@@ -69,6 +88,60 @@ class Orchestrator:
             return None
         return self.resolver.last_telemetry
 
+    # ------------------------------------------------------------------
+    # Phase diagnostics helpers (Stage 4.2.3)
+    # ------------------------------------------------------------------
+    def _safe_emit_phase(self, name: str, event: str, elapsed: float) -> None:
+        """Call the on_phase callback if set, swallowing any exceptions."""
+        if self._on_phase is None:
+            return
+        try:
+            self._on_phase(name, event, elapsed)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _sanitize_phase_elapsed(elapsed: float) -> float:
+        """Return a safe float duration, clamping invalid values to 0.0."""
+        try:
+            val = float(elapsed)
+            if val < 0.0 or val != val or val == float("inf") or val == float("-inf"):
+                return 0.0
+            return val
+        except (ValueError, TypeError):
+            return 0.0
+
+    @contextmanager
+    def _phase(self, name: str):
+        """Context manager that records timing for a named sub‑phase."""
+        start = time.perf_counter()
+        self._safe_emit_phase(name, "start", 0.0)
+        try:
+            yield
+        finally:
+            end = time.perf_counter()
+            elapsed = self._sanitize_phase_elapsed(end - start)
+            self._phase_timings[name] = self._phase_timings.get(name, 0.0) + elapsed
+            self._safe_emit_phase(name, "end", elapsed)
+
+    def _make_parser_callback(self) -> Optional[PhaseCallback]:
+        """
+        Return a callback that forwards phase events to the parent callback
+        with a 'parse_files.' prefix, or None if no parent callback is set.
+        Exceptions are silently swallowed.
+        """
+        parent = self._on_phase
+        if parent is None:
+            return None
+
+        def cb(name: str, event: str, elapsed: float) -> None:
+            try:
+                parent(f"parse_files.{name}", event, elapsed)
+            except Exception:
+                pass
+
+        return cb
+
     def run(self, project_path: str) -> GraphCore:
         """
         Execute the full ingestion → graph pipeline.
@@ -79,6 +152,9 @@ class Orchestrator:
         Returns:
             A validated GraphCore instance ready for reasoning/export.
         """
+        self._phase_timings = {}   # reset per run
+        self._last_parser_diagnostics = None
+
         logger.info("=" * 60)
         logger.info("🚀 LynkMesh Orchestrator Started")
         logger.info(f"📁 Project: {project_path}")
@@ -89,37 +165,45 @@ class Orchestrator:
         # ------------------------------------------------------------------
         # STEP 1 & 2: Ingestion (Parse + Normalize)
         # ------------------------------------------------------------------
-        logger.info("[1/6] Ingestion: Parsing project...")
-        parser = ParserEngine(max_workers=self.max_workers)
-        raw_ast = parser.parse(project_path)
-        if not raw_ast:
-            raise RuntimeError("Ingestion failed: no AST produced.")
-        logger.info(f"      Parsed {len(raw_ast)} files.")
+        with self._phase("parse_files"):
+            logger.info("[1/6] Ingestion: Parsing project...")
+            parser = ParserEngine(max_workers=self.max_workers)
+            # Stage 4.2.4 – forward callback to ParserEngine (prefix: parse_files.)
+            parser_cb = self._make_parser_callback()
+            if parser_cb is not None and hasattr(parser, "set_phase_callback"):
+                parser.set_phase_callback(parser_cb)
+            raw_ast = parser.parse(project_path)
+            self._last_parser_diagnostics = getattr(parser, "last_parser_diagnostics", None)
+            if not raw_ast:
+                raise RuntimeError("Ingestion failed: no AST produced.")
+            logger.info(f"      Parsed {len(raw_ast)} files.")
 
-        logger.info("[2/6] Ingestion: Normalizing IR...")
-        normalizer = IRNormalizer()
-        ir_list = normalizer.normalize(raw_ast)
-        logger.info(f"      Normalized {len(ir_list)} IR units.")
+        with self._phase("normalize_ir"):
+            logger.info("[2/6] Ingestion: Normalizing IR...")
+            normalizer = IRNormalizer()
+            ir_list = normalizer.normalize(raw_ast)
+            logger.info(f"      Normalized {len(ir_list)} IR units.")
 
         # ------------------------------------------------------------------
         # STEP 3: Structural Graph Construction
         # ------------------------------------------------------------------
-        logger.info("[3/6] Graph: Building structural graph...")
-        builder = GraphBuilder()
-        graph = builder.build_from_ir(ir_list)
-        stats_structural = graph.stats()
-        logger.info(
-            f"      Structural: {stats_structural['nodes']} nodes, {stats_structural['edges']} edges"
-        )
+        with self._phase("build_structural_graph"):
+            logger.info("[3/6] Graph: Building structural graph...")
+            builder = GraphBuilder()
+            graph = builder.build_from_ir(ir_list)
+            stats_structural = graph.stats()
+            logger.info(
+                f"      Structural: {stats_structural['nodes']} nodes, {stats_structural['edges']} edges"
+            )
 
-        # Stage 3.0.0 — assign version metadata immediately after structural
-        # build. content_hash is NOT yet computed (waits until finalization
-        # at end of run()). This gives subsequent phases access to graph_id
-        # / build_id for logging if needed.
-        graph._assign_initial_metadata(
-            project_path=project_path,
-            git_commit=None,
-        )
+            # Stage 3.0.0 — assign version metadata immediately after structural
+            # build. content_hash is NOT yet computed (waits until finalization
+            # at end of run()). This gives subsequent phases access to graph_id
+            # / build_id for logging if needed.
+            graph._assign_initial_metadata(
+                project_path=project_path,
+                git_commit=None,
+            )
 
         # ------------------------------------------------------------------
         # STEP 4: Call Resolution (adds internal call edges)
@@ -133,80 +217,82 @@ class Orchestrator:
             symbols = builder.get_symbol_registry()
 
             # ---- Hydrate TypeRegistry with parser-discovered return types ----
-            # Menangani berbagai format yang mungkin dari parser:
-            # 1) dict: {"Class::method": "ReturnType"}
-            # 2) list of dicts: [{"method_fqn": "...", "return_type": "..."}]
-            # 3) list of strings (format "Class::method" - tanpa return type, skip)
-            loaded_returns = 0
-            for ir in ir_list:
-                method_returns = ir.get("method_return_types")
-                if not method_returns:
-                    continue
+            with self._phase("hydrate_type_registry"):
+                # Menangani berbagai format yang mungkin dari parser:
+                # 1) dict: {"Class::method": "ReturnType"}
+                # 2) list of dicts: [{"method_fqn": "...", "return_type": "..."}]
+                # 3) list of strings (format "Class::method" - tanpa return type, skip)
+                loaded_returns = 0
+                for ir in ir_list:
+                    method_returns = ir.get("method_return_types")
+                    if not method_returns:
+                        continue
 
-                # Format 1: dict
-                if isinstance(method_returns, dict):
-                    for full_method, return_type in method_returns.items():
-                        if not isinstance(return_type, str):
-                            continue
-                        if "::" not in full_method:
-                            continue
-                        class_fqn, method_name = full_method.rsplit("::", 1)
-                        resolver.type_registry.add_return_type(
-                            class_fqn, method_name, return_type
-                        )
-                        loaded_returns += 1
+                    # Format 1: dict
+                    if isinstance(method_returns, dict):
+                        for full_method, return_type in method_returns.items():
+                            if not isinstance(return_type, str):
+                                continue
+                            if "::" not in full_method:
+                                continue
+                            class_fqn, method_name = full_method.rsplit("::", 1)
+                            resolver.type_registry.add_return_type(
+                                class_fqn, method_name, return_type
+                            )
+                            loaded_returns += 1
 
-                # Format 2: list of dicts
-                elif isinstance(method_returns, list):
-                    for entry in method_returns:
-                        if not isinstance(entry, dict):
-                            continue
-                        # Berbagai nama field yang mungkin
-                        fqn = (
-                            entry.get("method_fqn")
-                            or entry.get("fqn")
-                            or entry.get("class")
-                            or ""
-                        )
-                        method = (
-                            entry.get("method")
-                            or entry.get("name")
-                            or entry.get("method_name")
-                            or ""
-                        )
-                        rtype = (
-                            entry.get("return_type")
-                            or entry.get("type")
-                            or entry.get("returns")
-                        )
-                        if not fqn or not method or not rtype:
-                            continue
-                        # Jika fqn sudah mengandung ::, pisahkan
-                        if "::" in fqn:
-                            class_fqn, method_name = fqn.rsplit("::", 1)
-                        else:
-                            class_fqn, method_name = fqn, method
-                        resolver.type_registry.add_return_type(
-                            class_fqn, method_name, rtype
-                        )
-                        loaded_returns += 1
+                    # Format 2: list of dicts
+                    elif isinstance(method_returns, list):
+                        for entry in method_returns:
+                            if not isinstance(entry, dict):
+                                continue
+                            # Berbagai nama field yang mungkin
+                            fqn = (
+                                entry.get("method_fqn")
+                                or entry.get("fqn")
+                                or entry.get("class")
+                                or ""
+                            )
+                            method = (
+                                entry.get("method")
+                                or entry.get("name")
+                                or entry.get("method_name")
+                                or ""
+                            )
+                            rtype = (
+                                entry.get("return_type")
+                                or entry.get("type")
+                                or entry.get("returns")
+                            )
+                            if not fqn or not method or not rtype:
+                                continue
+                            # Jika fqn sudah mengandung ::, pisahkan
+                            if "::" in fqn:
+                                class_fqn, method_name = fqn.rsplit("::", 1)
+                            else:
+                                class_fqn, method_name = fqn, method
+                            resolver.type_registry.add_return_type(
+                                class_fqn, method_name, rtype
+                            )
+                            loaded_returns += 1
 
-            logger.info(
-                f"      Loaded {loaded_returns} parser-discovered return types into TypeRegistry"
-            )
+                logger.info(
+                    f"      Loaded {loaded_returns} parser-discovered return types into TypeRegistry"
+                )
 
-            graph = resolver.resolve(graph, symbols)
+            with self._phase("resolve_calls"):
+                graph = resolver.resolve(graph, symbols)
 
-            # Simpan resolver untuk export debug nanti
-            self.resolver = resolver
+                # Simpan resolver untuk export debug nanti
+                self.resolver = resolver
 
-            stats_resolved = graph.stats()
-            logger.info(
-                f"      After resolution: {stats_resolved['nodes']} nodes, {stats_resolved['edges']} edges"
-            )
-            logger.info(
-                f"      Added {stats_resolved['edges'] - stats_structural['edges']} call edges"
-            )
+                stats_resolved = graph.stats()
+                logger.info(
+                    f"      After resolution: {stats_resolved['nodes']} nodes, {stats_resolved['edges']} edges"
+                )
+                logger.info(
+                    f"      Added {stats_resolved['edges'] - stats_structural['edges']} call edges"
+                )
 
             # Ekspor debug propagation jika diminta
             if self.export_propagation_debug:
@@ -221,54 +307,60 @@ class Orchestrator:
         # STEP 5: Graph Enrichment (HTTP/route linking, framework patterns)
         # ------------------------------------------------------------------
         if self.enable_http_enrichment:
-            logger.info("[5/6] Graph: Enriching with HTTP/route links...")
-            try:
-                enricher = GraphEnricher(enable_http_linking=True)
-                graph = enricher.enrich(graph)
-                stats_enriched = graph.stats()
-                added = stats_enriched['edges'] - stats_resolved.get('edges', 0)
-                logger.info(
-                    f"      After enrichment: {stats_enriched['nodes']} nodes, {stats_enriched['edges']} edges"
-                )
-                logger.info(f"      Added {added} enrichment edges")
-            except Exception as e:
-                logger.error(f"Graph enrichment failed: {e}")
+            with self._phase("enrich_graph"):
+                logger.info("[5/6] Graph: Enriching with HTTP/route links...")
+                try:
+                    enricher = GraphEnricher(enable_http_linking=True)
+                    graph = enricher.enrich(graph)
+                    stats_enriched = graph.stats()
+                    added = stats_enriched['edges'] - stats_resolved.get('edges', 0)
+                    logger.info(
+                        f"      After enrichment: {stats_enriched['nodes']} nodes, {stats_enriched['edges']} edges"
+                    )
+                    logger.info(f"      Added {added} enrichment edges")
+                except Exception as e:
+                    logger.error(f"Graph enrichment failed: {e}")
         else:
             logger.info("[5/6] Graph: Enrichment disabled, skipping.")
 
         # ------------------------------------------------------------------
         # STEP 6: Validation
         # ------------------------------------------------------------------
-        logger.info("[6/6] Graph: Validating integrity...")
-        validator = GraphValidator()
-        report = validator.validate(graph)
+        with self._phase("validate_graph"):
+            logger.info("[6/6] Graph: Validating integrity...")
+            validator = GraphValidator()
+            report = validator.validate(graph)
 
-        if not report["valid"]:
-            for err in report["errors"]:
-                logger.error(f"❌ Validation Error: {err}")
-            raise RuntimeError("Graph validation failed. See errors above.")
+            if not report["valid"]:
+                for err in report["errors"]:
+                    logger.error(f"❌ Validation Error: {err}")
+                raise RuntimeError("Graph validation failed. See errors above.")
 
-        if report["warnings"]:
-            logger.warning(f"⚠️ {len(report['warnings'])} validation warnings (non‑fatal)")
+            if report["warnings"]:
+                logger.warning(f"⚠️ {len(report['warnings'])} validation warnings (non‑fatal)")
 
-        logger.info("=" * 60)
-        logger.info("✅ Pipeline completed successfully.")
-        final_stats = graph.stats()
-        logger.info(f"📊 Final Graph: {final_stats['nodes']} nodes, {final_stats['edges']} edges")
+        # ------------------------------------------------------------------
+        # Finalization (content hash, version)
+        # ------------------------------------------------------------------
+        with self._phase("finalize_content_hash"):
+            logger.info("=" * 60)
+            logger.info("✅ Pipeline completed successfully.")
+            final_stats = graph.stats()
+            logger.info(f"📊 Final Graph: {final_stats['nodes']} nodes, {final_stats['edges']} edges")
 
-        # Stage 3.0.0 — ensure version metadata is present on the final graph
-        # object before computing content_hash. This is intentionally placed at
-        # the finalization boundary because earlier pipeline phases may replace
-        # or mutate the graph object.
-        if getattr(graph, "_version_metadata", None) is None:
-            graph._assign_initial_metadata(
-                project_path=project_path,
-                git_commit=None,
-            )
+            # Stage 3.0.0 — ensure version metadata is present on the final graph
+            # object before computing content_hash. This is intentionally placed at
+            # the finalization boundary because earlier pipeline phases may replace
+            # or mutate the graph object.
+            if getattr(graph, "_version_metadata", None) is None:
+                graph._assign_initial_metadata(
+                    project_path=project_path,
+                    git_commit=None,
+                )
 
-        graph._finalize_content_hash()
-        logger.info(f"📦 Graph version: {graph.version!r}")
-        logger.info("=" * 60)
+            graph._finalize_content_hash()
+            logger.info(f"📦 Graph version: {graph.version!r}")
+            logger.info("=" * 60)
 
         return graph
 

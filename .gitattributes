@@ -1,0 +1,8 @@
+# LynkMesh repository line-ending policy
+* text=auto
+
+# Internal PHP bridge: keep parser/vendor text files stable across platforms
+ingestion/php_bridge/**/*.php text eol=lf
+ingestion/php_bridge/**/*.json text eol=lf
+ingestion/php_bridge/**/*.lock text eol=lf
+ingestion/php_bridge/vendor/** text eol=lf
