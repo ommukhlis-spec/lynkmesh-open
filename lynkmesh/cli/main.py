@@ -329,6 +329,109 @@ def cmd_pack(args: argparse.Namespace) -> int:
     return 0
 
 
+_SUPPORTED_PROFILES = ("compact", "balanced", "expanded")
+
+
+def build_benchmark_dict(project_path: str, profiles: Sequence[str]) -> dict:
+    """Build a deterministic MeshContext Token Benchmark dict for a project path.
+
+    Reuses the same public-safe report path as ``report``. The token benchmark
+    contract builds the AI Context Pack(s) internally. The serialized graph
+    payload is supplied as an additional calibration baseline. Contains no LLM
+    inference and writes no files.
+    """
+    from lynkmesh.semantic.contracts import (
+        build_mesh_context_report,
+        build_mesh_context_token_benchmark,
+    )
+
+    run = _run_pipeline(project_path)
+    payload = getattr(run, "serialized_payload", None)
+    if not payload:
+        raise RuntimeError("pipeline did not produce a serialized graph payload")
+
+    display_name = Path(project_path).name or None
+    report = build_mesh_context_report(
+        payload,
+        project_display_name=display_name,
+        pipeline_schema_version=getattr(run, "pipeline_schema_version", None),
+        generator_version=_get_version(),
+    )
+    return build_mesh_context_token_benchmark(
+        report.to_dict(),
+        profiles=list(profiles),
+        source_baselines={"serialized_graph_payload": payload},
+        benchmark_source_kind="mesh_context_report",
+    )
+
+
+def cmd_benchmark(args: argparse.Namespace) -> int:
+    quiet = getattr(args, "quiet", False)
+
+    def diag(message: str) -> None:
+        if not quiet:
+            sys.stderr.write(message + "\n")
+
+    path = Path(args.path)
+    if not path.exists():
+        sys.stderr.write("error: path does not exist\n")
+        return 1
+    if not path.is_dir():
+        sys.stderr.write("error: path must be a directory\n")
+        return 1
+
+    raw_profiles = getattr(args, "profiles", None)
+    if raw_profiles:
+        profiles = [p.strip() for p in raw_profiles.split(",") if p.strip()]
+    else:
+        profiles = [getattr(args, "profile", "compact")]
+
+    invalid = [p for p in profiles if p not in _SUPPORTED_PROFILES]
+    if invalid or not profiles:
+        supported = ", ".join(_SUPPORTED_PROFILES)
+        detail = ", ".join(invalid) if invalid else "(none provided)"
+        sys.stderr.write(
+            f"error: unsupported profile(s): {detail}; choose from {supported}\n"
+        )
+        return 2
+
+    diag(
+        "Building deterministic MeshContext Token Benchmark "
+        f"(profiles={','.join(profiles)}, no LLM inference, no files written)..."
+    )
+    try:
+        benchmark_dict = build_benchmark_dict(str(path), profiles)
+    except ValueError as exc:  # unsupported profile from the contract layer
+        sys.stderr.write(f"error: {exc}\n")
+        return 2
+    except Exception as exc:  # noqa: BLE001 - friendly error, no traceback
+        sys.stderr.write(
+            f"error: failed to build MeshContext Token Benchmark ({type(exc).__name__})\n"
+        )
+        return 1
+
+    # Privacy: fail closed if the projection contains unsafe strings.
+    try:
+        from lynkmesh.semantic.contracts import find_unsafe_token_benchmark_strings
+
+        unsafe = find_unsafe_token_benchmark_strings(benchmark_dict)
+    except Exception:  # noqa: BLE001 - scanner must never crash the command
+        unsafe = []
+    if unsafe:
+        sys.stderr.write(
+            "error: token benchmark payload failed the privacy safety scan; "
+            "output withheld\n"
+        )
+        return 1
+
+    if getattr(args, "pretty", False):
+        sys.stdout.write(json.dumps(benchmark_dict, indent=2, sort_keys=True) + "\n")
+    else:
+        sys.stdout.write(json.dumps(benchmark_dict, sort_keys=True) + "\n")
+    diag("Done.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="lynkmesh",
@@ -423,6 +526,50 @@ def build_parser() -> argparse.ArgumentParser:
         help="Suppress non-JSON diagnostics on stderr.",
     )
     pack.set_defaults(func=cmd_pack)
+
+    benchmark = subparsers.add_parser(
+        "benchmark",
+        help="Build a deterministic MeshContext Token Benchmark for a local project (JSON to stdout).",
+        description=(
+            "Build a deterministic MeshContext Token Benchmark for a local "
+            "project path and print it as JSON to stdout. Research preview. "
+            "Deterministic, no LLM inference, not production-ready. No files are "
+            "written and no network access is performed."
+        ),
+    )
+    benchmark.add_argument(
+        "path",
+        help="Path to a local project directory to analyze.",
+    )
+    benchmark.add_argument(
+        "--profile",
+        choices=("compact", "balanced", "expanded"),
+        default="compact",
+        help="Token benchmark profile (default: compact).",
+    )
+    benchmark.add_argument(
+        "--profiles",
+        default=None,
+        help=(
+            "Comma-separated profiles to benchmark, e.g. "
+            "compact,balanced,expanded. Overrides --profile when provided."
+        ),
+    )
+    benchmark.add_argument(
+        "--pretty",
+        action="store_true",
+        help="Indent the JSON output.",
+    )
+    benchmark.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress non-JSON diagnostics on stderr.",
+    )
+    benchmark.set_defaults(func=cmd_benchmark)
+
+
+
+
 
     return parser
 
