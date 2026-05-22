@@ -523,3 +523,76 @@ AI agents need more than larger context windows.
 They need stable semantic infrastructure.
 
 LynkMesh is an attempt to build that layer.
+
+<!-- LYNKMESH_PUBLIC_CLI_START -->
+## Public CLI quickstart
+
+LynkMesh provides a local-first public CLI for producing deterministic, static-analysis-derived artifacts from a local project.
+
+This workflow is a research preview / early validation. It is not production-ready, does not prove runtime behavior, and does not embed LLM inference in generated artifacts.
+
+### Commands
+
+```bash
+python -m lynkmesh doctor
+python -m lynkmesh report /path/to/project --pretty > report.json
+python -m lynkmesh pack /path/to/project --profile compact --pretty > ai-pack.json
+python -m lynkmesh benchmark /path/to/project --profile compact --pretty > benchmark.json
+```
+
+Windows:
+
+```bat
+python -m lynkmesh doctor
+python -m lynkmesh report "C:\path\to\project" --pretty > report.json
+python -m lynkmesh pack "C:\path\to\project" --profile compact --pretty > ai-pack.json
+python -m lynkmesh benchmark "C:\path\to\project" --profile compact --pretty > benchmark.json
+```
+
+### Artifact types
+
+- **MeshContext Report**: deterministic project graph facts and conservative architecture context.
+- **AI Context Pack**: compact, balanced, or expanded context package intended for AI assistants.
+- **Token Benchmark**: deterministic token estimate / calibration for report and pack profiles.
+
+Available profiles:
+
+- `compact`
+- `balanced`
+- `expanded`
+
+Default profile: `compact`.
+
+For benchmark multi-profile output, use:
+
+```bash
+python -m lynkmesh benchmark /path/to/project --profiles compact,balanced,expanded --pretty
+```
+
+### stdout and stderr
+
+For successful `report`, `pack`, and `benchmark` commands:
+
+- stdout is valid JSON.
+- stderr contains progress, warnings, and diagnostics.
+- redirect stdout with `>` to save artifacts.
+
+Validate JSON:
+
+```bash
+python -m json.tool report.json > /dev/null
+```
+
+Windows:
+
+```bat
+python -m json.tool report.json > nul
+```
+
+### Privacy and limitations
+
+The public CLI is local-first and does not perform network access. Generated payloads pass safety checks before printing, but they may still contain project names, symbols, structural information, and code-derived metadata. Avoid sharing generated JSON publicly if the source project is private.
+
+Static analysis can be incomplete. Dynamic dispatch and runtime behavior may be incomplete. Entrypoints, hotspots, and risk candidates are deterministic candidates, not confirmed defects.
+<!-- LYNKMESH_PUBLIC_CLI_END -->
+

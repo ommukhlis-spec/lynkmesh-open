@@ -109,3 +109,96 @@ status before relying on the output.
 - [The LynkMesh Protocol](lynkmesh_protocol.md)
 - [Case study template](case_study_template.md)
 - [MeshContext MCP release notes (v4.4.1)](mcp_mesh_context_release_notes_v4.4.1.md)
+
+<!-- LYNKMESH_PUBLIC_CLI_START -->
+# LynkMesh public CLI quickstart
+
+LynkMesh provides a local-first CLI for producing deterministic artifacts from a local project.
+
+This is a research preview / early validation workflow. It is not production-ready, does not prove runtime behavior, and does not embed LLM inference in generated artifacts.
+
+## 1. Check the environment
+
+```bash
+python -m lynkmesh doctor
+```
+
+## 2. Generate a MeshContext Report
+
+```bash
+python -m lynkmesh report /path/to/project --pretty > report.json
+```
+
+Windows:
+
+```bat
+python -m lynkmesh report "C:\path\to\project" --pretty > report.json
+```
+
+## 3. Generate an AI Context Pack
+
+```bash
+python -m lynkmesh pack /path/to/project --profile compact --pretty > ai-pack.json
+```
+
+Windows:
+
+```bat
+python -m lynkmesh pack "C:\path\to\project" --profile compact --pretty > ai-pack.json
+```
+
+Profiles:
+
+- `compact`
+- `balanced`
+- `expanded`
+
+Default profile: `compact`.
+
+## 4. Generate a Token Benchmark
+
+```bash
+python -m lynkmesh benchmark /path/to/project --profile compact --pretty > benchmark.json
+```
+
+Windows:
+
+```bat
+python -m lynkmesh benchmark "C:\path\to\project" --profile compact --pretty > benchmark.json
+```
+
+Multi-profile benchmark:
+
+```bash
+python -m lynkmesh benchmark /path/to/project --profiles compact,balanced,expanded --pretty
+```
+
+## 5. Validate JSON output
+
+For successful `report`, `pack`, and `benchmark` commands, stdout is valid JSON and stderr contains diagnostics.
+
+```bash
+python -m json.tool report.json > /dev/null
+python -m json.tool ai-pack.json > /dev/null
+python -m json.tool benchmark.json > /dev/null
+```
+
+Windows:
+
+```bat
+python -m json.tool report.json > nul
+python -m json.tool ai-pack.json > nul
+python -m json.tool benchmark.json > nul
+```
+
+## Notes
+
+- The CLI is local-first and does not perform network access.
+- `report`, `pack`, and `benchmark` do not write files unless stdout is redirected.
+- Generated artifacts contain no embedded LLM inference.
+- Generated payloads may contain project names, symbols, structural information, and code-derived metadata.
+- Static analysis can be incomplete.
+- Dynamic dispatch and runtime behavior may be incomplete.
+- Deterministic candidates are not confirmed runtime truth.
+<!-- LYNKMESH_PUBLIC_CLI_END -->
+
