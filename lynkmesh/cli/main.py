@@ -182,6 +182,88 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 0 if diag["essential_imports_ok"] else 1
 
 
+def _run_pipeline(project_path: str):
+    """Run a deterministic, no-cache build and return the run report.
+
+    Imports are deferred so that ``doctor`` and ``--help`` never pay the cost of
+    importing the pipeline, and so a pipeline import problem cannot break them.
+
+    The pipeline runs with caching disabled and cache-save skipped, so no files
+    are written. No network access is performed.
+    """
+    from lynkmesh.pipeline.incremental_pipeline import IncrementalPipeline
+
+    pipeline = IncrementalPipeline(cache_dir=None)
+    return pipeline.run(project_path, skip_cache_save=True)
+
+
+def build_report_dict(project_path: str) -> dict:
+    """Build a deterministic MeshContext Report dict for a local project path.
+
+    Pure projection over the serialized graph payload. Contains no LLM
+    inference and writes no files.
+    """
+    from lynkmesh.semantic.contracts import build_mesh_context_report
+
+    run = _run_pipeline(project_path)
+    payload = getattr(run, "serialized_payload", None)
+    if not payload:
+        raise RuntimeError("pipeline did not produce a serialized graph payload")
+
+    display_name = Path(project_path).name or None
+    report = build_mesh_context_report(
+        payload,
+        project_display_name=display_name,
+        pipeline_schema_version=getattr(run, "pipeline_schema_version", None),
+        generator_version=_get_version(),
+    )
+    return report.to_dict()
+
+
+def cmd_report(args: argparse.Namespace) -> int:
+    quiet = getattr(args, "quiet", False)
+
+    def diag(message: str) -> None:
+        if not quiet:
+            sys.stderr.write(message + "\n")
+
+    path = Path(args.path)
+    if not path.exists():
+        sys.stderr.write("error: path does not exist\n")
+        return 1
+    if not path.is_dir():
+        sys.stderr.write("error: path must be a directory\n")
+        return 1
+
+    diag("Building deterministic MeshContext Report (no LLM inference, no files written)...")
+    try:
+        report_dict = build_report_dict(str(path))
+    except Exception as exc:  # noqa: BLE001 - report a friendly error, no traceback
+        sys.stderr.write(f"error: failed to build MeshContext Report ({type(exc).__name__})\n")
+        return 1
+
+    # Privacy: fail closed if the projection contains unsafe strings.
+    try:
+        from lynkmesh.semantic.contracts import find_unsafe_report_strings
+
+        unsafe = find_unsafe_report_strings(report_dict)
+    except Exception:  # noqa: BLE001 - scanner must never crash the command
+        unsafe = []
+    if unsafe:
+        sys.stderr.write(
+            "error: report payload failed the privacy safety scan; "
+            "output withheld\n"
+        )
+        return 1
+
+    if getattr(args, "pretty", False):
+        sys.stdout.write(json.dumps(report_dict, indent=2, sort_keys=True) + "\n")
+    else:
+        sys.stdout.write(json.dumps(report_dict, sort_keys=True) + "\n")
+    diag("Done.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="lynkmesh",
@@ -218,6 +300,32 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print only a one-line result summary.",
     )
     doctor.set_defaults(func=cmd_doctor)
+
+    report = subparsers.add_parser(
+        "report",
+        help="Build a deterministic MeshContext Report for a local project (JSON to stdout).",
+        description=(
+            "Build a deterministic MeshContext Report for a local project path "
+            "and print it as JSON to stdout. Research preview. Deterministic, "
+            "no LLM inference, not production-ready. No files are written and no "
+            "network access is performed."
+        ),
+    )
+    report.add_argument(
+        "path",
+        help="Path to a local project directory to analyze.",
+    )
+    report.add_argument(
+        "--pretty",
+        action="store_true",
+        help="Indent the JSON output.",
+    )
+    report.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress non-JSON diagnostics on stderr.",
+    )
+    report.set_defaults(func=cmd_report)
 
     return parser
 
