@@ -2,7 +2,7 @@
 
 > Local-first semantic code intelligence infrastructure for AI agents.
 
-LynkMesh is an experimental open-core project for building deterministic code understanding layers on top of real-world software systems.
+LynkMesh is an experimental open-core project for building deterministic code-understanding layers on top of real-world software systems.
 
 Modern AI can read source code, but it still struggles to understand software systems as connected, evolving architectures. LynkMesh explores a graph-first approach: instead of treating a repository as isolated files, chunks, or embeddings, it models codebases as semantic graphs with explicit relationships, traversal boundaries, confidence signals, and architecture-aware retrieval.
 
@@ -34,17 +34,17 @@ LynkMesh exists to explore a missing infrastructure layer between raw source cod
 
 ```text
 Codebase
-   ↓
+  ↓
 Ingestion
-   ↓
+  ↓
 Intermediate Representation (IR)
-   ↓
+  ↓
 Semantic Graph
-   ↓
+  ↓
 Query / Reasoning Layer
-   ↓
+  ↓
 Context Compilation
-   ↓
+  ↓
 AI Agents
 ```
 
@@ -67,6 +67,126 @@ LynkMesh is not:
 - a generic code summarizer
 - a hosted SaaS dashboard
 - a production-ready autonomous coding agent
+- proof that an AI agent understands runtime behavior
+
+---
+
+## Current Status
+
+LynkMesh is currently an early validation / research preview. It is usable for research, experimentation, and internal evaluation, but public APIs are still evolving and breaking changes should be expected.
+
+Current focus:
+
+- deterministic graph foundations
+- graph versioning and serialization
+- semantic contracts
+- local-first artifact generation
+- query-layer stabilization
+- AI-oriented context retrieval
+- PHP-first static analysis exploration
+
+The public source checkout includes a local CLI for generating deterministic artifacts:
+
+- `python -m lynkmesh doctor`
+- `python -m lynkmesh report <path>`
+- `python -m lynkmesh pack <path>`
+- `python -m lynkmesh benchmark <path>`
+
+These commands run locally and do not embed LLM inference in generated artifacts.
+
+---
+
+## Install from Source
+
+Packaging is still being stabilized. For now, use the public repository from source:
+
+```bash
+git clone https://github.com/ommukhlis-spec/lynkmesh-open.git
+cd lynkmesh-open
+python -m pip install -U pip
+python -m pip install -e ".[dev]"
+```
+
+For source-checkout usage, the most robust command form is:
+
+```bash
+python -m lynkmesh --help
+```
+
+The console command is also exposed by `pyproject.toml` after installation:
+
+```bash
+lynkmesh --help
+```
+
+Do not treat the project as production-ready yet.
+
+---
+
+## Public CLI Quickstart
+
+Check the environment:
+
+```bash
+python -m lynkmesh doctor
+```
+
+Generate a MeshContext Report:
+
+```bash
+python -m lynkmesh report /path/to/project --pretty > report.json
+```
+
+Generate an AI Context Pack:
+
+```bash
+python -m lynkmesh pack /path/to/project --profile compact --pretty > ai-pack.json
+```
+
+Generate a Token Benchmark:
+
+```bash
+python -m lynkmesh benchmark /path/to/project --profile compact --pretty > benchmark.json
+```
+
+Run all benchmark profiles:
+
+```bash
+python -m lynkmesh benchmark /path/to/project --profiles compact,balanced,expanded --pretty > benchmark.json
+```
+
+For `report`, `pack`, and `benchmark`, stdout is JSON and stderr is reserved for diagnostics/progress messages. The commands do not write output files unless stdout is redirected.
+
+Validate generated JSON:
+
+```bash
+python -m json.tool report.json > /dev/null
+python -m json.tool ai-pack.json > /dev/null
+python -m json.tool benchmark.json > /dev/null
+```
+
+Windows:
+
+```bat
+python -m json.tool report.json > nul
+python -m json.tool ai-pack.json > nul
+python -m json.tool benchmark.json > nul
+```
+
+See [Quickstart](docs/quickstart.md) for a fuller CLI walkthrough and caveats.
+
+---
+
+## Documentation
+
+LynkMesh is an early validation / research preview of a deterministic context protocol for AI-assisted code understanding. It is not production-ready.
+
+- [The LynkMesh Protocol](docs/lynkmesh_protocol.md) — the problem, the deterministic pipeline, and the privacy model.
+- [Quickstart](docs/quickstart.md) — source checkout, CLI commands, validation workflow, and high-level local usage notes.
+- [Case study template](docs/case_study_template.md) — a reusable, sanitized format for analysis examples.
+- [MeshContext MCP release notes (v4.4.1)](docs/mcp_mesh_context_release_notes_v4.4.1.md) — current MCP capability metadata and guarantees.
+- [Public release notes (v0.1)](docs/public_release_notes_v0.1.md) — release status, what's included, and limitations.
+- [GitHub public profile draft](docs/github_public_profile.md) — suggested public-facing descriptions and release copy.
 
 ---
 
@@ -89,6 +209,7 @@ The public repository focuses on the local-first core:
 - basic analysis and reasoning layers
 - local MCP integration foundation
 - experimental PHP-oriented static analysis
+- public CLI artifact generation
 
 The Community Edition is intended to help developers and AI agents inspect, reason about, and retrieve structured context from codebases locally.
 
@@ -108,44 +229,6 @@ Advanced runtime capabilities may be developed separately as private or commerci
 - enterprise audit/security controls
 
 This boundary keeps the public core useful while preserving room for sustainable commercial development.
-
----
-
-## Current Status
-
-LynkMesh is currently in early alpha.
-
-The project is usable for research, experimentation, and internal development, but public APIs are still evolving.
-
-Current focus:
-
-- deterministic graph foundations
-- graph versioning and serialization
-- semantic contracts
-- query-layer stabilization
-- local MCP exposure
-- AI-oriented context retrieval
-- PHP-first static analysis exploration
-
-Expect breaking changes.
-
----
-
-## Documentation
-
-LynkMesh is currently an early validation / research preview of a deterministic context protocol for AI-assisted code understanding. It is not production-ready.
-
-- [The LynkMesh Protocol](docs/lynkmesh_protocol.md) — the problem, the deterministic pipeline, and the privacy model.
-- [Quickstart](docs/quickstart.md) — prerequisites, validation/smoke workflow, and high-level MCP usage.
-- [Case study template](docs/case_study_template.md) — a reusable, sanitized format for analysis examples.
-- [MeshContext MCP release notes (v4.4.1)](docs/mcp_mesh_context_release_notes_v4.4.1.md) — current MCP capability metadata and guarantees.
-
-### Release status
-
-LynkMesh is at an early validation / research-preview stage and is not production-ready.
-
-- [Public release notes (v0.1)](docs/public_release_notes_v0.1.md) — release status, what's included, and limitations.
-- [GitHub public profile draft](docs/github_public_profile.md) — suggested public-facing descriptions and release copy.
 
 ---
 
@@ -173,35 +256,19 @@ Unsupported languages should not be treated as fully analyzable. LynkMesh should
 
 ## MCP Integration
 
-LynkMesh is designed to be exposed to AI agents through the Model Context Protocol (MCP).
-
-The intended MCP model is local-first:
+LynkMesh is designed to be exposable to AI agents through the Model Context Protocol (MCP). The intended MCP model is local-first:
 
 ```text
 MCP Client / AI Client
-        ↓
+  ↓
 Local MCP Server
-        ↓
+  ↓
 LynkMesh Core
-        ↓
+  ↓
 Local Codebase
 ```
 
-This allows AI agents to use LynkMesh without uploading source code to a hosted service.
-
-Early MCP tools may include:
-
-- `ping`
-- `get_status`
-- `get_capabilities`
-- `scan_project`
-- `get_project_summary`
-- `build_graph`
-- `get_graph_summary`
-- `analyze_impact`
-- `trace_dependencies`
-
-MCP support is experimental and will evolve as the public interface stabilizes.
+This allows AI agents to use LynkMesh without uploading source code to a hosted service. MCP support is experimental and will evolve as the public interface stabilizes.
 
 ---
 
@@ -214,14 +281,12 @@ lynkmesh/
 │   ├── language loading
 │   ├── parser orchestration
 │   └── IR normalization
-│
 ├── graph/
 │   ├── graph building
 │   ├── call resolution
 │   ├── graph enrichment
 │   ├── graph mapping
 │   └── validation
-│
 ├── core/
 │   ├── graph core
 │   ├── graph versioning
@@ -229,35 +294,30 @@ lynkmesh/
 │   ├── IR models
 │   ├── symbol registry
 │   └── type registry
-│
 ├── semantic/contracts/
 │   ├── confidence semantics
 │   ├── resolution contracts
 │   ├── edge semantics
 │   ├── provenance
 │   └── telemetry
-│
 ├── analysis/
 │   ├── architecture analysis
 │   ├── flow analysis
 │   ├── impact analysis
 │   └── semantic reasoning
-│
 ├── query/
 │   ├── query planning
 │   ├── query execution
 │   └── unified query abstraction
-│
 ├── reasoning/
 │   ├── graph reasoning
 │   └── chain execution
-│
 ├── pipeline/
 │   └── orchestration layer
-│
 ├── exporters/
 │   └── experimental export interfaces
-│
+├── cli/
+│   └── public local CLI entrypoints
 └── test/
     ├── unit tests
     ├── integration tests
@@ -319,6 +379,7 @@ The public core currently focuses on:
 - telemetry contracts
 - basic architecture and reasoning layers
 - experimental query abstractions
+- local CLI artifact generation
 
 Advanced incremental runtime and persistent cache internals are intentionally not part of the public Community Edition at this stage.
 
@@ -326,9 +387,7 @@ Advanced incremental runtime and persistent cache internals are intentionally no
 
 ## Limitations
 
-LynkMesh is not production-ready yet.
-
-Known limitations:
+LynkMesh is not production-ready yet. Known limitations:
 
 - public APIs are not stable
 - MCP interface is still evolving
@@ -339,25 +398,9 @@ Known limitations:
 - exporters are still incomplete
 - query APIs are still experimental
 - large repository optimization is not yet public
+- generated token figures are deterministic heuristics, not tokenizer-exact billing estimates
 
 Use LynkMesh as research infrastructure and early alpha tooling.
-
----
-
-## Installation
-
-Packaging is still being stabilized.
-
-For now, use the repository from source:
-
-```bash
-git clone https://github.com/ommukhlis-spec/lynkmesh.git
-cd lynkmesh
-python -m pip install -U pip
-python -m pip install "mcp[cli]"
-```
-
-Additional dependency and packaging instructions will be added as the public CLI and MCP entrypoints stabilize.
 
 ---
 
@@ -367,6 +410,12 @@ Run tests from the repository root:
 
 ```bash
 python -m pytest
+```
+
+Run the public CLI tests:
+
+```bash
+python -m pytest test/unit/cli
 ```
 
 Run a specific test module:
@@ -435,6 +484,7 @@ It is not yet intended for:
 - impact-aware expansion
 - token-aware context selection
 - AI-ready explanation payloads
+- public CLI artifact generation
 
 ### Stage 5 — Advanced Runtime
 
@@ -484,14 +534,14 @@ Before larger architectural changes, please open an issue or discussion first.
 
 ## Security and Privacy
 
-LynkMesh Community Edition is designed to run locally.
+LynkMesh Community Edition is designed to run locally. The project should not upload source code by default.
 
-The project should not upload source code by default. Any future hosted or remote workflow should be explicit, permissioned, and documented separately.
+Any future hosted or remote workflow should be explicit, permissioned, and documented separately.
 
 Do not commit:
 
 - `.env`
-- local Claude settings
+- local AI client settings
 - private project paths
 - generated graph dumps
 - debug traces
@@ -502,9 +552,7 @@ Do not commit:
 
 ## License
 
-LynkMesh Community Edition is intended to be released under the Apache License 2.0.
-
-Commercial, hosted, or Pro runtime components may be distributed separately under different terms.
+LynkMesh Community Edition is intended to be released under the Apache License 2.0. Commercial, hosted, or Pro runtime components may be distributed separately under different terms.
 
 Before using LynkMesh in production, confirm the current license file in this repository.
 
@@ -518,81 +566,6 @@ Built as an independent semantic infrastructure research project for determinist
 
 ## Project Philosophy
 
-AI agents need more than larger context windows.
-
-They need stable semantic infrastructure.
+AI agents need more than larger context windows. They need stable semantic infrastructure.
 
 LynkMesh is an attempt to build that layer.
-
-<!-- LYNKMESH_PUBLIC_CLI_START -->
-## Public CLI quickstart
-
-LynkMesh provides a local-first public CLI for producing deterministic, static-analysis-derived artifacts from a local project.
-
-This workflow is a research preview / early validation. It is not production-ready, does not prove runtime behavior, and does not embed LLM inference in generated artifacts.
-
-### Commands
-
-```bash
-python -m lynkmesh doctor
-python -m lynkmesh report /path/to/project --pretty > report.json
-python -m lynkmesh pack /path/to/project --profile compact --pretty > ai-pack.json
-python -m lynkmesh benchmark /path/to/project --profile compact --pretty > benchmark.json
-```
-
-Windows:
-
-```bat
-python -m lynkmesh doctor
-python -m lynkmesh report "C:\path\to\project" --pretty > report.json
-python -m lynkmesh pack "C:\path\to\project" --profile compact --pretty > ai-pack.json
-python -m lynkmesh benchmark "C:\path\to\project" --profile compact --pretty > benchmark.json
-```
-
-### Artifact types
-
-- **MeshContext Report**: deterministic project graph facts and conservative architecture context.
-- **AI Context Pack**: compact, balanced, or expanded context package intended for AI assistants.
-- **Token Benchmark**: deterministic token estimate / calibration for report and pack profiles.
-
-Available profiles:
-
-- `compact`
-- `balanced`
-- `expanded`
-
-Default profile: `compact`.
-
-For benchmark multi-profile output, use:
-
-```bash
-python -m lynkmesh benchmark /path/to/project --profiles compact,balanced,expanded --pretty
-```
-
-### stdout and stderr
-
-For successful `report`, `pack`, and `benchmark` commands:
-
-- stdout is valid JSON.
-- stderr contains progress, warnings, and diagnostics.
-- redirect stdout with `>` to save artifacts.
-
-Validate JSON:
-
-```bash
-python -m json.tool report.json > /dev/null
-```
-
-Windows:
-
-```bat
-python -m json.tool report.json > nul
-```
-
-### Privacy and limitations
-
-The public CLI is local-first and does not perform network access. Generated payloads pass safety checks before printing, but they may still contain project names, symbols, structural information, and code-derived metadata. Avoid sharing generated JSON publicly if the source project is private.
-
-Static analysis can be incomplete. Dynamic dispatch and runtime behavior may be incomplete. Entrypoints, hotspots, and risk candidates are deterministic candidates, not confirmed defects.
-<!-- LYNKMESH_PUBLIC_CLI_END -->
-
