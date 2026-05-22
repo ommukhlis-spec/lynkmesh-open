@@ -32,6 +32,9 @@ classifiers = [
 ]
 dependencies = []
 
+[project.scripts]
+lynkmesh = "lynkmesh.cli.main:main"
+
 [project.optional-dependencies]
 dev = [
   "pytest>=8",
