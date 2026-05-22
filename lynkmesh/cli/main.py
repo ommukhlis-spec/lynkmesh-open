@@ -264,6 +264,71 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def build_pack_dict(project_path: str, profile: str = "compact") -> dict:
+    """Build a deterministic MeshContext AI Context Pack dict for a project path.
+
+    Reuses the same public-safe report path as ``report`` and projects the AI
+    Context Pack from it. Contains no LLM inference and writes no files.
+    """
+    from lynkmesh.semantic.contracts import build_mesh_context_ai_pack
+
+    report_dict = build_report_dict(project_path)
+    return build_mesh_context_ai_pack(report_dict, profile=profile)
+
+
+def cmd_pack(args: argparse.Namespace) -> int:
+    quiet = getattr(args, "quiet", False)
+
+    def diag(message: str) -> None:
+        if not quiet:
+            sys.stderr.write(message + "\n")
+
+    path = Path(args.path)
+    if not path.exists():
+        sys.stderr.write("error: path does not exist\n")
+        return 1
+    if not path.is_dir():
+        sys.stderr.write("error: path must be a directory\n")
+        return 1
+
+    profile = getattr(args, "profile", "compact")
+    diag(
+        "Building deterministic MeshContext AI Context Pack "
+        f"(profile={profile}, no LLM inference, no files written)..."
+    )
+    try:
+        pack_dict = build_pack_dict(str(path), profile=profile)
+    except ValueError as exc:  # unsupported profile from the contract layer
+        sys.stderr.write(f"error: {exc}\n")
+        return 2
+    except Exception as exc:  # noqa: BLE001 - friendly error, no traceback
+        sys.stderr.write(
+            f"error: failed to build MeshContext AI Context Pack ({type(exc).__name__})\n"
+        )
+        return 1
+
+    # Privacy: fail closed if the projection contains unsafe strings.
+    try:
+        from lynkmesh.semantic.contracts import find_unsafe_ai_pack_strings
+
+        unsafe = find_unsafe_ai_pack_strings(pack_dict)
+    except Exception:  # noqa: BLE001 - scanner must never crash the command
+        unsafe = []
+    if unsafe:
+        sys.stderr.write(
+            "error: AI Context Pack payload failed the privacy safety scan; "
+            "output withheld\n"
+        )
+        return 1
+
+    if getattr(args, "pretty", False):
+        sys.stdout.write(json.dumps(pack_dict, indent=2, sort_keys=True) + "\n")
+    else:
+        sys.stdout.write(json.dumps(pack_dict, sort_keys=True) + "\n")
+    diag("Done.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="lynkmesh",
@@ -326,6 +391,38 @@ def build_parser() -> argparse.ArgumentParser:
         help="Suppress non-JSON diagnostics on stderr.",
     )
     report.set_defaults(func=cmd_report)
+
+    pack = subparsers.add_parser(
+        "pack",
+        help="Build a deterministic MeshContext AI Context Pack for a local project (JSON to stdout).",
+        description=(
+            "Build a deterministic MeshContext AI Context Pack for a local "
+            "project path and print it as JSON to stdout. Research preview. "
+            "Deterministic, no LLM inference, not production-ready. No files are "
+            "written and no network access is performed."
+        ),
+    )
+    pack.add_argument(
+        "path",
+        help="Path to a local project directory to analyze.",
+    )
+    pack.add_argument(
+        "--profile",
+        choices=("compact", "balanced", "expanded"),
+        default="compact",
+        help="AI Context Pack profile (default: compact).",
+    )
+    pack.add_argument(
+        "--pretty",
+        action="store_true",
+        help="Indent the JSON output.",
+    )
+    pack.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress non-JSON diagnostics on stderr.",
+    )
+    pack.set_defaults(func=cmd_pack)
 
     return parser
 
