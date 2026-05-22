@@ -47,6 +47,88 @@ def _find_repo_root() -> Path:
 
 
 # ---------------------------------------------------------------------------
+# Parser bridge resolution sources (Stage 4.2.5.5C)
+# ---------------------------------------------------------------------------
+
+PARSER_SOURCE_EXPLICIT = "explicit_parser_path"
+PARSER_SOURCE_INTERNAL = "internal_bundle"
+PARSER_SOURCE_LEGACY = "legacy_root_fallback"
+PARSER_SOURCE_UNRESOLVED = "unresolved"
+
+
+def get_internal_php_bridge_dir() -> Path:
+    """Return the internal PHP bridge directory bundled with LynkMesh."""
+    return Path(__file__).resolve().parent / "ingestion" / "php_bridge"
+
+
+def get_internal_parser_path() -> Path:
+    """Return the bundled internal parser.php path."""
+    return get_internal_php_bridge_dir() / "parser.php"
+
+
+def resolve_parser_path() -> tuple[Path | None, dict]:
+    """
+    Resolve parser.php without raising.
+
+    Resolution order:
+    1. LYNKMESH_PARSER_PATH
+    2. internal ingestion/php_bridge/parser.php
+    3. LYNKMESH_LEGACY_ROOT fallback
+    4. unresolved
+    """
+    explicit_raw = os.getenv("LYNKMESH_PARSER_PATH")
+    legacy_raw = os.getenv("LYNKMESH_LEGACY_ROOT")
+
+    internal_parser = get_internal_parser_path()
+
+    info = {
+        "source": PARSER_SOURCE_UNRESOLVED,
+        "resolved_path": None,
+        "explicit_parser_path_was_set": bool(explicit_raw),
+        "explicit_parser_path": explicit_raw,
+        "explicit_parser_path_exists": None,
+        "internal_bundle_path": str(internal_parser),
+        "internal_bundle_exists": internal_parser.exists(),
+        "legacy_root_was_set": bool(legacy_raw),
+        "legacy_root": legacy_raw,
+        "legacy_parser_path": None,
+        "legacy_parser_exists": False,
+    }
+
+    if explicit_raw:
+        explicit_path = Path(explicit_raw).resolve()
+        info["explicit_parser_path_exists"] = explicit_path.exists()
+        if explicit_path.exists():
+            info["source"] = PARSER_SOURCE_EXPLICIT
+            info["resolved_path"] = str(explicit_path)
+            return explicit_path, info
+
+    if internal_parser.exists():
+        info["source"] = PARSER_SOURCE_INTERNAL
+        info["resolved_path"] = str(internal_parser)
+        return internal_parser, info
+
+    if legacy_raw:
+        try:
+            legacy_root = Path(legacy_raw).resolve()
+            legacy_candidates = [
+                legacy_root / "ast_bridge" / "parser.php",
+                legacy_root / "lynkmesh" / "ast_bridge" / "parser.php",
+            ]
+            for candidate in legacy_candidates:
+                info["legacy_parser_path"] = str(candidate)
+                info["legacy_parser_exists"] = candidate.exists()
+                if candidate.exists():
+                    info["source"] = PARSER_SOURCE_LEGACY
+                    info["resolved_path"] = str(candidate)
+                    return candidate, info
+        except Exception:
+            pass
+
+    return None, info
+
+
+# ---------------------------------------------------------------------------
 # Public API — Legacy runtime compatibility
 # ---------------------------------------------------------------------------
 
@@ -198,6 +280,10 @@ def get_legacy_lynkmesh_path() -> Path:
     )
 
 
+# ---------------------------------------------------------------------------
+# Public API — Parser path resolution (updated Stage 4.2.5.5C)
+# ---------------------------------------------------------------------------
+
 def get_parser_path() -> Path:
     """
     Return the absolute path to ``parser.php``.
@@ -205,40 +291,22 @@ def get_parser_path() -> Path:
     Resolution order:
 
     1. Environment variable ``LYNKMESH_PARSER_PATH``
-    2. <legacy_root>/ast_bridge/parser.php
-    3. <legacy_root>/lynkmesh/ast_bridge/parser.php
-    4. <get_legacy_lynkmesh_path()>/ast_bridge/parser.php
-
-    Raises:
-        FileNotFoundError: if the parser cannot be found.
+    2. Internal bundled bridge: ingestion/php_bridge/parser.php
+    3. Legacy runtime fallback
     """
-    env_path = os.getenv("LYNKMESH_PARSER_PATH")
-    if env_path:
-        path = Path(env_path).resolve()
-        if path.exists():
-            return path
-        raise FileNotFoundError(
-            f"Parser not found at LYNKMESH_PARSER_PATH: {env_path}"
-        )
-
-    legacy_root = get_legacy_root()
-
-    candidates = [
-        legacy_root / "ast_bridge" / "parser.php",
-        legacy_root / "lynkmesh" / "ast_bridge" / "parser.php",
-        get_legacy_lynkmesh_path() / "ast_bridge" / "parser.php",
-    ]
-
-    attempted: list[str] = []
-    for parser_path in candidates:
-        attempted.append(f"  • {parser_path}")
-        if parser_path.exists():
-            return parser_path
+    path, info = resolve_parser_path()
+    if path is not None:
+        return path
 
     raise FileNotFoundError(
         "parser.php not found.\n"
         "Tried:\n"
-        + "\n".join(attempted)
-        + "\n\nSet LYNKMESH_PARSER_PATH directly, or ensure the legacy runtime "
-        "contains ast_bridge/parser.php."
+        f"  • LYNKMESH_PARSER_PATH: {info.get('explicit_parser_path')} "
+        f"(exists={info.get('explicit_parser_path_exists')})\n"
+        f"  • Internal bundle: {info.get('internal_bundle_path')} "
+        f"(exists={info.get('internal_bundle_exists')})\n"
+        f"  • Legacy fallback from LYNKMESH_LEGACY_ROOT: {info.get('legacy_root')} "
+        f"(parser={info.get('legacy_parser_path')}, exists={info.get('legacy_parser_exists')})\n"
+        "\nSet LYNKMESH_PARSER_PATH directly, restore the internal php_bridge, "
+        "or configure LYNKMESH_LEGACY_ROOT as fallback."
     )

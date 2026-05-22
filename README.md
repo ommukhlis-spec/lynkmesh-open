@@ -1,118 +1,525 @@
-# LynkMesh Open Core
+# LynkMesh
 
-LynkMesh is an open-core code graph foundation for building deterministic, queryable snapshots of legacy codebases.
+> Local-first semantic code intelligence infrastructure for AI agents.
 
-The open-core package focuses on the foundations: graph construction, stable graph identity, canonical serialization, local graph caching, graph snapshot diffing, and an incremental pipeline report API that can be consumed by future CLI, editor, or integration layers.
+LynkMesh is an experimental open-core project for building deterministic code understanding layers on top of real-world software systems.
 
-## What this repository provides
+Modern AI can read source code, but it still struggles to understand software systems as connected, evolving architectures. LynkMesh explores a graph-first approach: instead of treating a repository as isolated files, chunks, or embeddings, it models codebases as semantic graphs with explicit relationships, traversal boundaries, confidence signals, and architecture-aware retrieval.
 
-- Deterministic graph identity with `GraphVersion`
-- Canonical JSON-safe graph serialization with `GraphSerializer`
-- Local filesystem graph snapshot caching with `GraphCache`
-- Deterministic graph snapshot diffs with `IncrementalDiffEngine`
-- A consumer-facing `IncrementalPipeline` summary/report API
-- Semantic contract primitives for resolver confidence, provenance, telemetry, and debug exports
-- Public unit and contract tests for the open-core boundary
+The long-term goal is to provide a reliable semantic substrate for AI-native software engineering systems.
 
-## Current scope
+---
 
-LynkMesh currently emphasizes deterministic static graph construction and snapshot comparison.
+## Why LynkMesh Exists
 
-For dynamic runtime behavior, framework magic, reflection-heavy code, and dependency injection patterns, results may be incomplete. Treat LynkMesh output as developer-assistance signals rather than absolute ground truth.
+Most AI coding tools rely heavily on:
 
-## Open-core versus premium boundary
+- large context windows
+- file chunking
+- vector search
+- heuristic retrieval
+- repeated repository scanning
 
-The open-core edition provides the deterministic graph foundation.
+These approaches are useful, but they often fail when a system requires:
 
-Advanced impact analysis, AI-assisted reasoning, production integration tools, team workflows, commercial automation, and future partial-rebuild systems are expected to live in premium or private packages.
+- deterministic dependency awareness
+- architecture-level reasoning
+- impact analysis
+- request-flow understanding
+- large-codebase navigation
+- persistent project memory
+- safe context selection for AI agents
 
-## Installation for development
-
-From the repository root:
-
-```bash
-python -m pip install -e .[dev]
-```
-
-Or run the public tests directly from the repository root:
-
-```bash
-python -m pytest test/unit/core/test_graph_version.py -v
-python -m pytest test/unit/core/test_graph_serializer.py -v
-python -m pytest test/unit/pipeline/test_incremental_pipeline_schema.py -v
-python -m pytest test/semantic/contracts/ -v
-```
-
-## Determinism requirement
-
-For deterministic graph builds, set:
-
-```bash
-PYTHONHASHSEED=0
-```
-
-On Windows CMD:
-
-```cmd
-set PYTHONHASHSEED=0
-```
-
-## Legacy parser bridge
-
-Some current PHP ingestion paths can use an optional legacy parser runtime via environment variables:
-
-```bash
-LYNKMESH_LEGACY_ROOT=/path/to/legacy_runtime
-LYNKMESH_PARSER_PATH=/path/to/parser.php
-```
-
-The legacy runtime itself is not included in this open-core repository. Native parser and ingestion improvements are expected to evolve over time.
-
-## Core modules
+LynkMesh exists to explore a missing infrastructure layer between raw source code and AI reasoning.
 
 ```text
-lynkmesh/core/graph_core.py          Core graph container
-lynkmesh/core/graph_version.py       Stable graph identity and content hash
-lynkmesh/core/graph_serializer.py    Canonical graph serialization
-lynkmesh/core/graph_cache.py         Local graph snapshot cache
-lynkmesh/core/incremental_diff.py    Graph snapshot diff engine
-lynkmesh/pipeline/orchestrator.py    Full graph build orchestration
-lynkmesh/pipeline/incremental_pipeline.py
-                                     Full-build + cache + diff report layer
+Codebase
+   ↓
+Ingestion
+   ↓
+Intermediate Representation (IR)
+   ↓
+Semantic Graph
+   ↓
+Query / Reasoning Layer
+   ↓
+Context Compilation
+   ↓
+AI Agents
 ```
 
-## IncrementalPipeline API
+---
 
-`IncrementalPipeline` currently performs a full graph build, serializes the graph, optionally saves it to local cache, and compares it with a prior cached snapshot when available.
+## What LynkMesh Is
 
-It does not yet perform partial rebuilds or file watching.
+LynkMesh is:
 
-See:
+- a semantic graph engine for codebases
+- a deterministic code reasoning foundation
+- a local-first context layer for AI agents
+- an experimental MCP-ready infrastructure layer
+- a foundation for architecture-aware retrieval
+
+LynkMesh is not:
+
+- a chatbot wrapper
+- a vector database
+- a generic code summarizer
+- a hosted SaaS dashboard
+- a production-ready autonomous coding agent
+
+---
+
+## Open-Core Model
+
+LynkMesh is being developed as an open-core project.
+
+### Community Edition
+
+The public repository focuses on the local-first core:
+
+- deterministic graph identity
+- graph serialization foundations
+- ingestion pipeline
+- parser orchestration
+- IR normalization
+- graph construction
+- semantic contracts
+- symbol/type registry foundations
+- basic analysis and reasoning layers
+- local MCP integration foundation
+- experimental PHP-oriented static analysis
+
+The Community Edition is intended to help developers and AI agents inspect, reason about, and retrieve structured context from codebases locally.
+
+### Pro / Private Runtime
+
+Advanced runtime capabilities may be developed separately as private or commercial layers, including:
+
+- incremental diff runtime
+- persistent graph cache runtime
+- large-repository optimization
+- advanced semantic cache
+- team/workspace graph memory
+- hosted MCP server
+- cloud repository connectors
+- multi-project indexing
+- advanced framework-aware analysis
+- enterprise audit/security controls
+
+This boundary keeps the public core useful while preserving room for sustainable commercial development.
+
+---
+
+## Current Status
+
+LynkMesh is currently in early alpha.
+
+The project is usable for research, experimentation, and internal development, but public APIs are still evolving.
+
+Current focus:
+
+- deterministic graph foundations
+- graph versioning and serialization
+- semantic contracts
+- query-layer stabilization
+- local MCP exposure
+- AI-oriented context retrieval
+- PHP-first static analysis exploration
+
+Expect breaking changes.
+
+---
+
+## Documentation
+
+LynkMesh is currently an early validation / research preview of a deterministic context protocol for AI-assisted code understanding. It is not production-ready.
+
+- [The LynkMesh Protocol](docs/lynkmesh_protocol.md) — the problem, the deterministic pipeline, and the privacy model.
+- [Quickstart](docs/quickstart.md) — prerequisites, validation/smoke workflow, and high-level MCP usage.
+- [Case study template](docs/case_study_template.md) — a reusable, sanitized format for analysis examples.
+- [MeshContext MCP release notes (v4.4.1)](docs/mcp_mesh_context_release_notes_v4.4.1.md) — current MCP capability metadata and guarantees.
+
+### Release status
+
+LynkMesh is at an early validation / research-preview stage and is not production-ready.
+
+- [Public release notes (v0.1)](docs/public_release_notes_v0.1.md) — release status, what's included, and limitations.
+- [GitHub public profile draft](docs/github_public_profile.md) — suggested public-facing descriptions and release copy.
+
+---
+
+## Current Language Support
+
+LynkMesh should be treated as language-layered:
 
 ```text
-lynkmesh/pipeline/INCREMENTAL_PIPELINE_API.md
+Core graph engine       = language-agnostic
+Ingestion / parser      = language-specific
+Framework understanding = framework-specific
 ```
 
-## Minimal example
+Current practical support:
 
-```python
-from lynkmesh.pipeline.incremental_pipeline import IncrementalPipeline
+| Language | Status | Notes |
+|---|---|---|
+| PHP | Partial / early alpha | File scanning, namespace/class-oriented parsing, dependency graph foundations |
+| Laravel-style PHP | Experimental | Some architectural patterns are being explored, but framework magic is not fully modeled |
+| Other languages | Not officially supported | Basic file inventory may be possible later, but semantic graph accuracy is not guaranteed |
 
-pipeline = IncrementalPipeline(cache_dir=".lynkmesh-cache")
-report = pipeline.run("/path/to/project")
+Unsupported languages should not be treated as fully analyzable. LynkMesh should report unsupported or fallback behavior instead of pretending to understand code it cannot reliably parse.
 
-print(report.summary_line())
-print(report.to_summary_dict())
+---
+
+## MCP Integration
+
+LynkMesh is designed to be exposed to AI agents through the Model Context Protocol (MCP).
+
+The intended MCP model is local-first:
+
+```text
+MCP Client / AI Client
+        ↓
+Local MCP Server
+        ↓
+LynkMesh Core
+        ↓
+Local Codebase
 ```
+
+This allows AI agents to use LynkMesh without uploading source code to a hosted service.
+
+Early MCP tools may include:
+
+- `ping`
+- `get_status`
+- `get_capabilities`
+- `scan_project`
+- `get_project_summary`
+- `build_graph`
+- `get_graph_summary`
+- `analyze_impact`
+- `trace_dependencies`
+
+MCP support is experimental and will evolve as the public interface stabilizes.
+
+---
+
+## Architecture Overview
+
+```text
+lynkmesh/
+├── ingestion/
+│   ├── file scanning
+│   ├── language loading
+│   ├── parser orchestration
+│   └── IR normalization
+│
+├── graph/
+│   ├── graph building
+│   ├── call resolution
+│   ├── graph enrichment
+│   ├── graph mapping
+│   └── validation
+│
+├── core/
+│   ├── graph core
+│   ├── graph versioning
+│   ├── graph serialization
+│   ├── IR models
+│   ├── symbol registry
+│   └── type registry
+│
+├── semantic/contracts/
+│   ├── confidence semantics
+│   ├── resolution contracts
+│   ├── edge semantics
+│   ├── provenance
+│   └── telemetry
+│
+├── analysis/
+│   ├── architecture analysis
+│   ├── flow analysis
+│   ├── impact analysis
+│   └── semantic reasoning
+│
+├── query/
+│   ├── query planning
+│   ├── query execution
+│   └── unified query abstraction
+│
+├── reasoning/
+│   ├── graph reasoning
+│   └── chain execution
+│
+├── pipeline/
+│   └── orchestration layer
+│
+├── exporters/
+│   └── experimental export interfaces
+│
+└── test/
+    ├── unit tests
+    ├── integration tests
+    └── semantic contract tests
+```
+
+---
+
+## Core Principles
+
+### Determinism
+
+LynkMesh prioritizes deterministic graph identity, stable serialization, and reproducible reasoning boundaries.
+
+AI systems can hallucinate. Infrastructure should not.
+
+### Semantic Graphs Over Raw Files
+
+The goal is not only to retrieve files, but to understand relationships between entities:
+
+- files
+- symbols
+- classes
+- methods
+- dependencies
+- calls
+- semantic edges
+- architectural boundaries
+
+### Local-First by Default
+
+The Community Edition is designed to run locally. Source code should remain on the developer machine unless the user explicitly chooses a hosted workflow.
+
+### AI-Oriented Context
+
+LynkMesh is designed for AI consumption. Outputs should be structured, scoped, and explicit enough for agents to reason over safely.
+
+### Honest Capability Reporting
+
+If a language, framework, or runtime behavior is not supported, LynkMesh should say so clearly.
+
+---
+
+## Current Public Capabilities
+
+The public core currently focuses on:
+
+- file scanning foundations
+- parser orchestration
+- IR normalization
+- graph construction
+- graph version identity
+- deterministic serialization foundations
+- symbol registry
+- type registry
+- semantic contracts
+- confidence semantics
+- provenance tracking
+- telemetry contracts
+- basic architecture and reasoning layers
+- experimental query abstractions
+
+Advanced incremental runtime and persistent cache internals are intentionally not part of the public Community Edition at this stage.
+
+---
 
 ## Limitations
 
-- Static graph construction is not equivalent to runtime tracing.
-- Framework-specific behavior may require additional modeling.
-- Reflection, dynamic dispatch, and dependency injection can reduce call-graph precision.
-- Partial rebuild is not implemented in the open-core foundation yet.
-- Production integrations are outside this repository's current scope.
+LynkMesh is not production-ready yet.
+
+Known limitations:
+
+- public APIs are not stable
+- MCP interface is still evolving
+- PHP support is partial
+- non-PHP languages are not officially supported
+- framework magic is not fully modeled
+- runtime behavior is not fully inferred
+- exporters are still incomplete
+- query APIs are still experimental
+- large repository optimization is not yet public
+
+Use LynkMesh as research infrastructure and early alpha tooling.
+
+---
+
+## Installation
+
+Packaging is still being stabilized.
+
+For now, use the repository from source:
+
+```bash
+git clone https://github.com/ommukhlis-spec/lynkmesh.git
+cd lynkmesh
+python -m pip install -U pip
+python -m pip install "mcp[cli]"
+```
+
+Additional dependency and packaging instructions will be added as the public CLI and MCP entrypoints stabilize.
+
+---
+
+## Development
+
+Run tests from the repository root:
+
+```bash
+python -m pytest
+```
+
+Run a specific test module:
+
+```bash
+python -m pytest test/unit/core/test_graph_version.py -v
+```
+
+Some modules are experimental and may change rapidly.
+
+---
+
+## Suggested Use Cases
+
+LynkMesh Community Edition is currently best suited for:
+
+- AI-assisted codebase exploration
+- semantic graph experiments
+- local MCP tooling experiments
+- deterministic graph identity research
+- architecture-aware retrieval prototypes
+- PHP-oriented static analysis exploration
+- building foundations for AI code intelligence systems
+
+It is not yet intended for:
+
+- production CI enforcement
+- enterprise dependency governance
+- complete runtime tracing
+- universal multi-language analysis
+- fully automated refactoring workflows
+
+---
+
+## Roadmap
+
+### Stage 1 — Semantic Foundation
+
+- ingestion pipeline
+- parser orchestration
+- IR normalization
+- graph construction
+- symbol/type registries
+
+### Stage 2 — Deterministic Graph Core
+
+- graph identity
+- graph versioning
+- semantic contracts
+- confidence/provenance/telemetry
+- deterministic serialization
+
+### Stage 3 — MCP + Query Layer
+
+- local MCP server
+- capability reporting
+- graph summary tools
+- project scanning tools
+- scoped query APIs
+- AI-oriented context retrieval
+
+### Stage 4 — Context Compiler
+
+- context ranking
+- semantic neighborhood retrieval
+- impact-aware expansion
+- token-aware context selection
+- AI-ready explanation payloads
+
+### Stage 5 — Advanced Runtime
+
+Advanced runtime capabilities may be developed in private or commercial layers:
+
+- incremental diff engine
+- persistent graph cache
+- large-repo graph optimization
+- hosted MCP
+- team graph memory
+- cloud repository integrations
+
+---
+
+## Repository Hygiene
+
+The public repository intentionally excludes:
+
+- local AI client settings
+- private diagnostics
+- local benchmark project paths
+- debug artifacts
+- generated graph caches
+- experimental private runtime modules
+
+If you find sensitive or machine-local artifacts in the public repository, please open an issue.
+
+---
+
+## Contributing
+
+LynkMesh is still early. Contributions are welcome, but the architecture is moving quickly.
+
+Good contribution areas:
+
+- documentation
+- tests
+- parser fixtures
+- small bug fixes
+- semantic contract improvements
+- MCP tool interface feedback
+- supported-language capability reporting
+
+Before larger architectural changes, please open an issue or discussion first.
+
+---
+
+## Security and Privacy
+
+LynkMesh Community Edition is designed to run locally.
+
+The project should not upload source code by default. Any future hosted or remote workflow should be explicit, permissioned, and documented separately.
+
+Do not commit:
+
+- `.env`
+- local Claude settings
+- private project paths
+- generated graph dumps
+- debug traces
+- API keys
+- local cache databases
+
+---
 
 ## License
 
-Apache License 2.0. See `LICENSE`.
+LynkMesh Community Edition is intended to be released under the Apache License 2.0.
+
+Commercial, hosted, or Pro runtime components may be distributed separately under different terms.
+
+Before using LynkMesh in production, confirm the current license file in this repository.
+
+---
+
+## Author
+
+Built as an independent semantic infrastructure research project for deterministic AI-oriented code intelligence.
+
+---
+
+## Project Philosophy
+
+AI agents need more than larger context windows.
+
+They need stable semantic infrastructure.
+
+LynkMesh is an attempt to build that layer.

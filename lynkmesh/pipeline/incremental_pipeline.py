@@ -39,6 +39,8 @@ Pipeline invariants:
 from __future__ import annotations
 
 import os
+import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -77,7 +79,6 @@ RESULT_STATUS_SUCCESS: str = "success"
 
 # Cache status values exposed in report.
 CACHE_STATUS_SAVED: str = "saved"
-
 CACHE_STATUS_DEDUPLICATED: str = "deduplicated"
 CACHE_STATUS_DISABLED: str = "disabled"
 CACHE_STATUS_SAVE_SKIPPED: str = "save_skipped"
@@ -87,6 +88,14 @@ COMPARISON_STATUS_NO_PRIOR: str = "no_prior"
 COMPARISON_STATUS_PRIOR_CORRUPT: str = "prior_corrupt"
 COMPARISON_STATUS_COMPARED: str = "compared"
 COMPARISON_STATUS_DISABLED: str = "comparison_disabled"
+
+
+# =============================================================================
+# Type aliases
+# =============================================================================
+
+PhaseCallback = Callable[[str, str, float], None]
+"""Callback for phase timing events: (name, event, elapsed_seconds)."""
 
 
 # =============================================================================
@@ -136,6 +145,18 @@ class IncrementalRunReport:
     # Stage 3.5.0 addition: marker for explicit-hash compare mode.
     # None = implicit latest lookup; str = explicit hash provided.
     _explicit_compare_hash: Optional[str] = None
+    # Stage 3.5.1 addition: captured serialized payload for in-process consumers.
+    # Excluded from to_dict() / to_summary_dict() to preserve Stage 3.5 schema freeze.
+    # Used by MCP query tools (Stage 4.1.0) to build a queryable snapshot.
+    # None if not captured (legacy callers).
+    serialized_payload: Optional[Dict[str, Any]] = field(default=None, repr=False)
+    # Stage 4.2.2 addition: internal phase timing diagnostics.
+    # Excluded from to_dict() and to_summary_dict(). Diagnostic-only.
+    # None when phase timing is not collected.
+    pipeline_phase_timings: Optional[Dict[str, float]] = field(default=None, repr=False)
+    # Stage 4.2.5.1 — legacy ParallelParser runtime diagnostics.
+    # Excluded from to_dict()/to_summary_dict(). None when not collected.
+    parser_runtime_diagnostics: Optional[Dict[str, Any]] = field(default=None, repr=False)
 
     # ------------------------------------------------------------------
     # Derived properties (Stage 3.5.0 additions)
@@ -372,6 +393,7 @@ class IncrementalPipeline:
         cache_dir: Optional[os.PathLike] = None,
         orchestrator: Optional[Orchestrator] = None,
         orchestrator_factory: Optional[Callable[[], Orchestrator]] = None,
+        on_phase: Optional[PhaseCallback] = None,
     ) -> None:
         """
         Args:
@@ -382,6 +404,8 @@ class IncrementalPipeline:
             orchestrator_factory: callable returning a fresh Orchestrator.
                 Used per run. If neither orchestrator nor factory given,
                 default factory creates a vanilla Orchestrator().
+            on_phase: optional callback for phase timing diagnostics.
+                (name, event, elapsed_seconds). Never breaks pipeline.
 
         Raises:
             PipelineConfigurationError: if both orchestrator and
@@ -406,6 +430,7 @@ class IncrementalPipeline:
         self._orchestrator_factory: Optional[Callable[[], Orchestrator]] = (
             orchestrator_factory
         )
+        self._on_phase = on_phase
 
     # ------------------------------------------------------------------
     # Public API
@@ -449,23 +474,36 @@ class IncrementalPipeline:
                 save failures.
             Any exception from Orchestrator.run or serialize_graph.
         """
+        # Phase timing collection (Stage 4.2.2)
+        self._phase_timings: Dict[str, float] = {}
+        self._last_parser_diagnostics: Optional[Dict[str, Any]] = None
         warnings_log: List[str] = []
 
         # --- Step 1: Build full graph via Orchestrator -------------------
-        orch = self._resolve_orchestrator()
-        graph = orch.run(project_path)
+        with self._phase("resolve_orchestrator"):
+            orch = self._resolve_orchestrator()
+            # Stage 4.2.3 — forward callback to Orchestrator if supported
+            cb = self._make_orchestrator_callback()
+            if cb is not None and hasattr(orch, "set_phase_callback"):
+                orch.set_phase_callback(cb)
+
+        with self._phase("orchestrator_run"):
+            graph = orch.run(project_path)
+        # Stage 4.2.5.1 — capture parser runtime diagnostics from Orchestrator
+        self._last_parser_diagnostics = getattr(orch, "last_parser_diagnostics", None)
 
         # --- Step 2: Serialize current graph -----------------------------
         # serialize_graph requires finalized graph.version; Orchestrator
         # finalizes at end of run(). If serialization fails, the build
         # state is corrupt and exception propagates.
-        current_payload = serialize_graph(graph)
-        current_version = current_payload["version"]
-        current_metadata = current_version["metadata"]
-        current_content_hash = current_version["content_hash"]
-        current_graph_id = current_metadata["graph_id"]
-        current_build_id = current_metadata["build_id"]
-        current_stats = dict(current_payload["stats"])
+        with self._phase("serialize_graph"):
+            current_payload = serialize_graph(graph)
+            current_version = current_payload["version"]
+            current_metadata = current_version["metadata"]
+            current_content_hash = current_version["content_hash"]
+            current_graph_id = current_metadata["graph_id"]
+            current_build_id = current_metadata["build_id"]
+            current_stats = dict(current_payload["stats"])
 
         # --- Step 3: Capture prior BEFORE save (P4) ----------------------
         prior_payload: Optional[Dict[str, Any]] = None
@@ -474,92 +512,101 @@ class IncrementalPipeline:
         comparison_status: str
         diff_report: Optional[DiffReport] = None
 
-        if not self.cache_enabled:
-            comparison_status = COMPARISON_STATUS_DISABLED
-        else:
-            assert self._cache is not None  # for type-checker
-            try:
-                if compare_against_content_hash is not None:
-                    # Explicit lookup — caller named this hash. Propagate
-                    # errors; don't soft-handle.
-                    prior_entry = self._cache.load_by_content_hash(
-                        compare_against_content_hash
+        with self._phase("cache_load_prior"):
+            if not self.cache_enabled:
+                comparison_status = COMPARISON_STATUS_DISABLED
+            else:
+                assert self._cache is not None  # for type-checker
+                try:
+                    if compare_against_content_hash is not None:
+                        # Explicit lookup — caller named this hash. Propagate
+                        # errors; don't soft-handle.
+                        prior_entry = self._cache.load_by_content_hash(
+                            compare_against_content_hash
+                        )
+                    else:
+                        # Implicit latest lookup — soft-handle miss/corruption.
+                        prior_entry = self._cache.load_latest(current_graph_id)
+                    prior_payload = prior_entry.payload
+                    prior_content_hash = prior_entry.content_hash
+                    prior_meta = prior_payload.get("version", {}).get("metadata", {})
+                    prior_build_id = prior_meta.get("build_id")
+                    comparison_status = COMPARISON_STATUS_COMPARED
+                except CacheMissError as exc:
+                    if compare_against_content_hash is not None:
+                        # Explicit hash request → propagate
+                        raise
+                    comparison_status = COMPARISON_STATUS_NO_PRIOR
+                except (CacheCorruptionError, CacheSchemaMismatchError) as exc:
+                    if compare_against_content_hash is not None:
+                        raise
+                    comparison_status = COMPARISON_STATUS_PRIOR_CORRUPT
+                    warnings_log.append(
+                        f"Prior cache entry was corrupt or schema-mismatched: {exc}"
                     )
-                else:
-                    # Implicit latest lookup — soft-handle miss/corruption.
-                    prior_entry = self._cache.load_latest(current_graph_id)
-                prior_payload = prior_entry.payload
-                prior_content_hash = prior_entry.content_hash
-                prior_meta = prior_payload.get("version", {}).get("metadata", {})
-                prior_build_id = prior_meta.get("build_id")
-                comparison_status = COMPARISON_STATUS_COMPARED
-            except CacheMissError as exc:
-                if compare_against_content_hash is not None:
-                    # Explicit hash request → propagate
-                    raise
-                comparison_status = COMPARISON_STATUS_NO_PRIOR
-            except (CacheCorruptionError, CacheSchemaMismatchError) as exc:
-                if compare_against_content_hash is not None:
-                    raise
-                comparison_status = COMPARISON_STATUS_PRIOR_CORRUPT
-                warnings_log.append(
-                    f"Prior cache entry was corrupt or schema-mismatched: {exc}"
-                )
 
         # --- Step 4: Save current to cache -------------------------------
         cache_status: str
         content_path_str: Optional[str] = None
-        if not self.cache_enabled:
-            cache_status = CACHE_STATUS_DISABLED
-        elif skip_cache_save:
-            cache_status = CACHE_STATUS_SAVE_SKIPPED
-        else:
-            assert self._cache is not None
-            # save may raise; we propagate because user provided cache_dir
-            # which is an explicit opt-in.
-            record: CacheRecord = self._cache.save(graph)
-            content_path_str = str(record.content_path)
-            cache_status = (
-                CACHE_STATUS_DEDUPLICATED if record.deduplicated
-                else CACHE_STATUS_SAVED
-            )
-
-        # --- Step 5: Compute diff if we have a prior payload -------------
-        if prior_payload is not None:
-            try:
-                diff_report = diff_payloads(prior_payload, current_payload)
-            except MalformedPayloadError as exc:
-                # Cache returned an entry but its shape is malformed.
-                # Soft-handle: downgrade to prior_corrupt.
-                comparison_status = COMPARISON_STATUS_PRIOR_CORRUPT
-                diff_report = None
-                prior_content_hash = None
-                prior_build_id = None
-                warnings_log.append(
-                    f"Prior cache entry payload was malformed; "
-                    f"diff aborted: {exc}"
+        with self._phase("cache_save"):
+            if not self.cache_enabled:
+                cache_status = CACHE_STATUS_DISABLED
+            elif skip_cache_save:
+                cache_status = CACHE_STATUS_SAVE_SKIPPED
+            else:
+                assert self._cache is not None
+                # save may raise; we propagate because user provided cache_dir
+                # which is an explicit opt-in.
+                record: CacheRecord = self._cache.save(graph)
+                content_path_str = str(record.content_path)
+                cache_status = (
+                    CACHE_STATUS_DEDUPLICATED if record.deduplicated
+                    else CACHE_STATUS_SAVED
                 )
 
+        # --- Step 5: Compute diff if we have a prior payload -------------
+        with self._phase("diff_payloads"):
+            if prior_payload is not None:
+                try:
+                    diff_report = diff_payloads(prior_payload, current_payload)
+                except MalformedPayloadError as exc:
+                    # Cache returned an entry but its shape is malformed.
+                    # Soft-handle: downgrade to prior_corrupt.
+                    comparison_status = COMPARISON_STATUS_PRIOR_CORRUPT
+                    diff_report = None
+                    prior_content_hash = None
+                    prior_build_id = None
+                    warnings_log.append(
+                        f"Prior cache entry payload was malformed; "
+                        f"diff aborted: {exc}"
+                    )
+
         # --- Step 6: Assemble report -------------------------------------
-        return IncrementalRunReport(
-            pipeline_schema_version=PIPELINE_SCHEMA_VERSION,
-            completed_at=_now_utc_iso(),
-            project_path=str(project_path),
-            current_graph_id=current_graph_id,
-            current_build_id=current_build_id,
-            current_content_hash=current_content_hash,
-            current_stats=current_stats,
-            cache_enabled=self.cache_enabled,
-            cache_status=cache_status,
-            cache_dir=(str(self._cache_dir) if self._cache_dir else None),
-            content_path=content_path_str,
-            comparison_status=comparison_status,
-            prior_content_hash=prior_content_hash,
-            prior_build_id=prior_build_id,
-            diff_report=diff_report,
-            warnings=warnings_log,
-            _explicit_compare_hash=compare_against_content_hash,
-        )
+        with self._phase("build_report"):
+            report = IncrementalRunReport(
+                pipeline_schema_version=PIPELINE_SCHEMA_VERSION,
+                completed_at=_now_utc_iso(),
+                project_path=str(project_path),
+                current_graph_id=current_graph_id,
+                current_build_id=current_build_id,
+                current_content_hash=current_content_hash,
+                current_stats=current_stats,
+                cache_enabled=self.cache_enabled,
+                cache_status=cache_status,
+                cache_dir=(str(self._cache_dir) if self._cache_dir else None),
+                content_path=content_path_str,
+                comparison_status=comparison_status,
+                prior_content_hash=prior_content_hash,
+                prior_build_id=prior_build_id,
+                diff_report=diff_report,
+                warnings=warnings_log,
+                _explicit_compare_hash=compare_against_content_hash,
+                serialized_payload=current_payload,
+                pipeline_phase_timings=dict(self._phase_timings) if self._phase_timings else None,
+                parser_runtime_diagnostics=self._last_parser_diagnostics,
+            )
+
+        return report
 
     # ------------------------------------------------------------------
     # Internal
@@ -572,6 +619,65 @@ class IncrementalPipeline:
         if self._orchestrator_factory is not None:
             return self._orchestrator_factory()
         return Orchestrator()
+
+    # ------------------------------------------------------------------
+    # Phase diagnostics helpers (Stage 4.2.2)
+    # ------------------------------------------------------------------
+
+    def _safe_emit_phase(self, name: str, event: str, elapsed: float) -> None:
+        """Call the on_phase callback if set, swallowing any exceptions."""
+        if self._on_phase is None:
+            return
+        try:
+            self._on_phase(name, event, elapsed)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _sanitize_phase_elapsed(elapsed: float) -> float:
+        """Return a safe float duration, clamping invalid values to 0.0."""
+        try:
+            val = float(elapsed)
+            if val < 0.0 or val != val or val == float("inf") or val == float("-inf"):
+                return 0.0
+            return val
+        except (ValueError, TypeError):
+            return 0.0
+
+    @contextmanager
+    def _phase(self, name: str):
+        """Context manager that records timing for a named phase."""
+        start = time.perf_counter()
+        self._safe_emit_phase(name, "start", 0.0)
+        try:
+            yield
+        finally:
+            end = time.perf_counter()
+            elapsed = self._sanitize_phase_elapsed(end - start)
+            self._phase_timings[name] = self._phase_timings.get(name, 0.0) + elapsed
+            self._safe_emit_phase(name, "end", elapsed)
+
+    # ------------------------------------------------------------------
+    # Stage 4.2.3 – Orchestrator callback forwarding
+    # ------------------------------------------------------------------
+
+    def _make_orchestrator_callback(self) -> Optional[PhaseCallback]:
+        """
+        Return a callback that prefixes phase names with 'orchestrator.' 
+        and forwards to the parent callback, or None if no parent callback 
+        is set. Exceptions are silently swallowed.
+        """
+        parent = self._on_phase
+        if parent is None:
+            return None
+
+        def cb(name: str, event: str, elapsed: float) -> None:
+            try:
+                parent(f"orchestrator.{name}", event, elapsed)
+            except Exception:
+                pass
+
+        return cb
 
 
 # =============================================================================
