@@ -149,6 +149,16 @@ LynkMesh is at an early validation / research-preview stage and is not productio
 
 ---
 
+## Public Evidence Pack
+
+LynkMesh now includes a public-safe before/after evidence pack for reviewing how deterministic graph artifacts can ground AI-assisted code understanding workflows.
+
+- [evals/before_after/](evals/before_after/) defines the repeatable evaluation baseline, wording rules, metric schema, and public-safety guidelines.
+- [evals/before_after/runs/mini_auth_shop_php_001/](evals/before_after/runs/mini_auth_shop_php_001/) is the first committed fixture-level run, including deterministic CLI artifacts, before/after transcripts, screenshots, and a conservative comparison summary.
+- The evidence pack is an early validation baseline, not benchmark proof. It does not claim LynkMesh makes an AI model smarter, and it should not be treated as production-ready performance evidence.
+
+Use this pack to inspect what LynkMesh exposes to an AI agent: deterministic, sanitized graph evidence and context artifacts without raw private source code.
+
 ## Current Language Support
 
 LynkMesh should be treated as language-layered:
@@ -595,3 +605,4 @@ The public CLI is local-first and does not perform network access. Generated pay
 
 Static analysis can be incomplete. Dynamic dispatch and runtime behavior may be incomplete. Entrypoints, hotspots, and risk candidates are deterministic candidates, not confirmed defects.
 <!-- LYNKMESH_PUBLIC_CLI_END -->
+
