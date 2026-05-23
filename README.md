@@ -605,4 +605,3 @@ The public CLI is local-first and does not perform network access. Generated pay
 
 Static analysis can be incomplete. Dynamic dispatch and runtime behavior may be incomplete. Entrypoints, hotspots, and risk candidates are deterministic candidates, not confirmed defects.
 <!-- LYNKMESH_PUBLIC_CLI_END -->
-
