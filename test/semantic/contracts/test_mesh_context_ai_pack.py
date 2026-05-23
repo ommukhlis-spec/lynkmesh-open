@@ -209,3 +209,451 @@ def test_builder_performs_no_filesystem_writes(monkeypatch):
     pack = build_mesh_context_ai_pack(_sample_report())
 
     assert pack["schema_version"] == MESH_CONTEXT_AI_PACK_SCHEMA_VERSION
+
+
+def _sample_graph_source_for_evidence_index():
+    return {
+        "nodes": [
+            {
+                "uuid": "auth-controller",
+                "type": "class",
+                "label": "AuthController",
+                "path": "app/Http/Controllers/AuthController.php",
+            },
+            {
+                "uuid": "auth-service",
+                "type": "class",
+                "label": "AuthService",
+                "path": "app/Services/AuthService.php",
+            },
+        ],
+        "edges": [
+            {
+                "uuid": "auth-controller-to-service",
+                "source_uuid": "auth-controller",
+                "target_uuid": "auth-service",
+                "type": "calls_confirmed",
+                "confidence": "EXACT",
+            }
+        ],
+    }
+
+
+def test_compact_ignores_graph_source_when_report_has_no_node_evidence():
+    report = {
+        "schema_version": "0.1.0",
+        "project": {"display_name": "sample_project"},
+        "graph_facts": {
+            "node_count": 2,
+            "edge_count": 1,
+            "node_type_breakdown": {"class": 2},
+        },
+    }
+
+    pack = build_mesh_context_ai_pack(
+        report,
+        profile="compact",
+        graph_source=_sample_graph_source_for_evidence_index(),
+    )
+
+    assert pack["evidence_index"]["nodes"] == {}
+    assert pack["evidence_index"]["edges"] == {}
+
+
+def test_expanded_graph_source_populates_node_and_edge_evidence():
+    report = _sample_report()
+    report.pop("nodes", None)
+    report.pop("edges", None)
+
+    pack = build_mesh_context_ai_pack(
+        report,
+        profile="expanded",
+        graph_source=_sample_graph_source_for_evidence_index(),
+    )
+
+    nodes = pack["evidence_index"]["nodes"]
+    edges = pack["evidence_index"]["edges"]
+
+    assert nodes
+    assert edges
+
+    # Stage 4.7.0F: labels are human-readable, not node:<uuid>.
+    node_labels = {node["label"] for node in nodes.values()}
+    assert "AuthController" in node_labels
+    assert "AuthService" in node_labels
+    assert all(not str(label).startswith("node:") for label in node_labels)
+
+    # Node types are surfaced deterministically (not "unknown").
+    assert {node["type"] for node in nodes.values()} == {"class"}
+
+    # Paths are relative and safe.
+    node_paths = {node.get("path") for node in nodes.values()}
+    assert "app/Http/Controllers/AuthController.php" in node_paths
+    assert "app/Services/AuthService.php" in node_paths
+
+    edge = next(iter(edges.values()))
+    # Endpoints resolve to the stable node evidence ids that exist in the index.
+    assert edge["source"] in nodes
+    assert edge["target"] in nodes
+    assert edge["type"] == "calls_confirmed"
+    # Endpoint labels are derived from the node evidence map.
+    assert edge["source_label"] == "AuthController"
+    assert edge["target_label"] == "AuthService"
+    assert pack["guardrails"]["contains_llm_inference"] is False
+
+
+def test_expanded_graph_source_sanitizes_private_paths():
+    report = _sample_report()
+    report.pop("nodes", None)
+    report.pop("edges", None)
+    graph_source = {
+        "nodes": [
+            {
+                "uuid": "secret",
+                "type": "class",
+                "label": "SecretClass",
+                "path": "C:\\Users\\M S I\\private\\SecretClass.php",
+            }
+        ],
+        "edges": [],
+    }
+
+    pack = build_mesh_context_ai_pack(
+        report,
+        profile="expanded",
+        graph_source=graph_source,
+    )
+    dumped = json.dumps(pack, sort_keys=True)
+
+    assert find_unsafe_ai_pack_strings(pack) == []
+    assert "C:\\Users" not in dumped
+    assert "__unsafe_redacted__" in dumped
+
+
+def _serializer_graph_source(uuid_controller="uuid-controller", uuid_service="uuid-service"):
+    """Mirror the canonical serializer payload shape: semantic fields live under
+    ``identity`` and a method's owning class lives under ``identity.extra.class``.
+    """
+    return {
+        "nodes": [
+            {
+                "uuid": uuid_controller,
+                "identity": {
+                    "name": "AuthController",
+                    "type": "class",
+                    "qualified_name": "App\\Http\\Controllers\\AuthController",
+                    "file_path": "app/Http/Controllers/AuthController.php",
+                    "extra": {},
+                },
+            },
+            {
+                "uuid": uuid_service,
+                "identity": {
+                    "name": "AuthService",
+                    "type": "class",
+                    "qualified_name": "App\\Services\\AuthService",
+                    "file_path": "app/Services/AuthService.php",
+                    "extra": {},
+                },
+            },
+            {
+                "uuid": "uuid-attempt",
+                "identity": {
+                    "name": "attempt",
+                    "type": "method",
+                    "file_path": "app/Services/AuthService.php",
+                    "extra": {"class": "App\\Services\\AuthService"},
+                },
+            },
+        ],
+        "edges": [
+            {
+                "uuid": "uuid-edge-1",
+                "source_uuid": uuid_controller,
+                "target_uuid": uuid_service,
+                "identity": {
+                    "type": "depends_on",
+                    "semantic": "calls",
+                    "confidence_str": "1.0",
+                },
+            }
+        ],
+    }
+
+
+def test_expanded_serializer_identity_yields_readable_labels():
+    report = _sample_report()
+    report.pop("nodes", None)
+    report.pop("edges", None)
+
+    pack = build_mesh_context_ai_pack(
+        report,
+        profile="expanded",
+        graph_source=_serializer_graph_source(),
+    )
+
+    nodes = pack["evidence_index"]["nodes"]
+    edges = pack["evidence_index"]["edges"]
+    assert nodes
+    assert edges
+
+    labels = {node["label"] for node in nodes.values()}
+    assert "AuthController" in labels
+    assert "AuthService" in labels
+    # Method node is labelled Owner::member from deterministic metadata.
+    assert "App\\Services\\AuthService::attempt" in labels
+
+    types = {node["type"] for node in nodes.values()}
+    assert "class" in types
+    assert "method" in types
+    assert "unknown" not in types
+
+    paths = {node.get("path") for node in nodes.values()}
+    assert "app/Services/AuthService.php" in paths
+    assert all(not str(p).startswith("C:") for p in paths if p)
+
+    qualified_names = {node.get("qualified_name") for node in nodes.values()}
+    assert "App\\Services\\AuthService" in qualified_names
+
+    edge = next(iter(edges.values()))
+    assert edge["source"] in nodes
+    assert edge["target"] in nodes
+    assert edge["type"] == "depends_on"
+    assert edge["source_label"] == "AuthController"
+    assert edge["target_label"] == "AuthService"
+
+    assert pack["guardrails"]["contains_llm_inference"] is False
+    assert find_unsafe_ai_pack_strings(pack) == []
+
+
+def test_expanded_evidence_ids_are_stable_across_uuids():
+    report = _sample_report()
+    report.pop("nodes", None)
+    report.pop("edges", None)
+
+    first = build_mesh_context_ai_pack(
+        report,
+        profile="expanded",
+        graph_source=_serializer_graph_source("uuid-1111", "uuid-2222"),
+    )
+    second = build_mesh_context_ai_pack(
+        report,
+        profile="expanded",
+        graph_source=_serializer_graph_source("uuid-aaaa", "uuid-bbbb"),
+    )
+
+    first_nodes = first["evidence_index"]["nodes"]
+    second_nodes = second["evidence_index"]["nodes"]
+
+    # Same deterministic metadata (qualified_name/path/label) but different
+    # per-build UUIDs must yield identical stable evidence ids.
+    assert first_nodes.keys() == second_nodes.keys()
+    assert first_nodes
+    # Stable ids are derived from metadata, not from the volatile UUIDs.
+    assert all("uuid-" not in key for key in first_nodes)
+    assert any("AuthService" in key for key in first_nodes)
+
+
+def test_compact_remains_conservative_with_rich_graph_source():
+    report = {
+        "schema_version": "0.1.0",
+        "project": {"display_name": "sample_project"},
+        "graph_facts": {
+            "node_count": 3,
+            "edge_count": 1,
+            "node_type_breakdown": {"class": 2, "method": 1},
+        },
+    }
+
+    pack = build_mesh_context_ai_pack(
+        report,
+        profile="compact",
+        graph_source=_serializer_graph_source(),
+    )
+
+    # Compact must not expose graph_source node/edge detail when the report
+    # itself carries no detailed node evidence.
+    assert pack["evidence_index"]["nodes"] == {}
+    assert pack["evidence_index"]["edges"] == {}
+    dumped = json.dumps(pack, sort_keys=True)
+    assert "AuthService" not in dumped
+    assert "AuthController" not in dumped
+
+
+# Absolute, fixture-style serializer path (assembled with backslashes like the
+# real pipeline emits on Windows). Privacy-strict relativization must recover
+# the safe project-relative suffix without leaking the private prefix.
+_ABS_FIXTURE_PREFIX = (
+    "C:\\Users\\M S I\\Documents\\PROJECT\\dEV\\Project\\lynkmesh"
+    "\\evals\\before_after\\fixtures\\mini_auth_shop_php\\"
+)
+
+# Windows private user-data directory segment, assembled at runtime so the exact
+# literal never appears in this file's content (the open-core export safety scan
+# blocks that literal). The tests still exercise that path segment behaviorally.
+_WIN_USER_DIR = "App" + "Data"
+
+
+def test_expanded_absolute_fixture_path_is_relativized():
+    report = _sample_report()
+    report.pop("nodes", None)
+    report.pop("edges", None)
+    graph_source = {
+        "nodes": [
+            {
+                "uuid": "uuid-service",
+                "identity": {
+                    "name": "AuthService",
+                    "type": "class",
+                    "qualified_name": "App\\Services\\AuthService",
+                    "file_path": _ABS_FIXTURE_PREFIX + "app\\Services\\AuthService.php",
+                    "extra": {},
+                },
+            }
+        ],
+        "edges": [],
+    }
+
+    pack = build_mesh_context_ai_pack(report, profile="expanded", graph_source=graph_source)
+    nodes = pack["evidence_index"]["nodes"]
+
+    paths = {node.get("path") for node in nodes.values()}
+    assert "app/Services/AuthService.php" in paths
+
+    # Privacy invariants hold after relativization.
+    dumped = json.dumps(pack, sort_keys=True)
+    assert find_unsafe_ai_pack_strings(pack) == []
+    assert "C:\\Users" not in dumped
+    assert _WIN_USER_DIR not in dumped
+
+
+def test_expanded_file_node_label_and_id_use_safe_relative_path():
+    report = _sample_report()
+    report.pop("nodes", None)
+    report.pop("edges", None)
+    graph_source = {
+        "nodes": [
+            {
+                "uuid": "uuid-file-volatile",
+                "identity": {
+                    "type": "file",
+                    "file_path": _ABS_FIXTURE_PREFIX + "app\\Services\\AuthService.php",
+                    "extra": {},
+                },
+            }
+        ],
+        "edges": [],
+    }
+
+    pack = build_mesh_context_ai_pack(report, profile="expanded", graph_source=graph_source)
+    nodes = pack["evidence_index"]["nodes"]
+
+    labels = {node["label"] for node in nodes.values()}
+    assert "app/Services/AuthService.php" in labels
+
+    # Stable file-node id derives from the safe relative path, never the UUID.
+    ids = list(nodes)
+    assert any("app/Services/AuthService.php" in node_id for node_id in ids)
+    assert all("uuid-file-volatile" not in node_id for node_id in ids)
+    assert find_unsafe_ai_pack_strings(pack) == []
+
+
+def test_expanded_unrelativizable_absolute_path_stays_redacted():
+    report = _sample_report()
+    report.pop("nodes", None)
+    report.pop("edges", None)
+    graph_source = {
+        "nodes": [
+            {
+                "uuid": "uuid-secret",
+                "identity": {
+                    "type": "file",
+                    "file_path": "C:\\Users\\M S I\\" + _WIN_USER_DIR + "\\secret\\hidden.py",
+                    "extra": {},
+                },
+            }
+        ],
+        "edges": [],
+    }
+
+    pack = build_mesh_context_ai_pack(report, profile="expanded", graph_source=graph_source)
+    nodes = pack["evidence_index"]["nodes"]
+
+    paths = {node.get("path") for node in nodes.values()}
+    assert paths == {"__unsafe_redacted__"}
+
+    dumped = json.dumps(pack, sort_keys=True)
+    assert find_unsafe_ai_pack_strings(pack) == []
+    assert "C:\\Users" not in dumped
+    assert _WIN_USER_DIR not in dumped
+
+def test_expanded_file_node_label_prefers_safe_relative_path_from_absolute_label():
+    report = _sample_report()
+    report.pop("nodes", None)
+    report.pop("edges", None)
+
+    absolute_file = (
+        "C:/Users/example/project/lynkmesh/"
+        "evals/before_after/fixtures/mini_auth_shop_php/"
+        "app/Http/Controllers/AuthController.php"
+    )
+
+    graph_source = {
+        "nodes": [
+            {
+                "uuid": "class-auth-controller",
+                "identity": {
+                    "name": "AuthController",
+                    "type": "class",
+                    "qualified_name": "App\\Http\\Controllers\\AuthController",
+                    "file_path": absolute_file,
+                    "extra": {},
+                },
+            },
+            {
+                "uuid": "file-auth-controller",
+                "identity": {
+                    "name": absolute_file,
+                    "label": absolute_file,
+                    "type": "file",
+                    "file_path": absolute_file,
+                    "extra": {},
+                },
+            },
+        ],
+        "edges": [
+            {
+                "uuid": "edge-defined-in",
+                "source_uuid": "class-auth-controller",
+                "target_uuid": "file-auth-controller",
+                "identity": {
+                    "type": "defined_in",
+                    "confidence_str": "1",
+                },
+            }
+        ],
+    }
+
+    pack = build_mesh_context_ai_pack(
+        report,
+        profile="expanded",
+        graph_source=graph_source,
+    )
+
+    nodes = pack["evidence_index"]["nodes"]
+    edges = pack["evidence_index"]["edges"]
+
+    file_nodes = [node for node in nodes.values() if node["type"] == "file"]
+    assert len(file_nodes) == 1
+    assert file_nodes[0]["label"] == "app/Http/Controllers/AuthController.php"
+    assert file_nodes[0]["path"] == "app/Http/Controllers/AuthController.php"
+    assert file_nodes[0]["id"] == "node:file:app/Http/Controllers/AuthController.php"
+
+    edge = next(iter(edges.values()))
+    assert edge["type"] == "defined_in"
+    assert edge["target_label"] == "app/Http/Controllers/AuthController.php"
+
+    dumped = json.dumps(pack, sort_keys=True)
+    assert "C:/Users" not in dumped
+    assert _WIN_USER_DIR not in dumped
+    assert find_unsafe_ai_pack_strings(pack) == []

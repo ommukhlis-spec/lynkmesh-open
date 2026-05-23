@@ -1,0 +1,68 @@
+{
+  "benchmark_source_kind": "mesh_context_report",
+  "best_profile_by_tokens": "compact",
+  "calibration_notes": [
+    "Benchmarks contain derived metrics only and do not embed raw reports, graph payloads, or AI Context Packs.",
+    "Negative reduction can occur when the MeshContext Report baseline is already a minimal MCP projection.",
+    "Token estimates use a deterministic character heuristic and are not model-specific billing claims.",
+    "serialized_graph_payload baseline measures the MCP graph snapshot serialization size without exposing the raw payload."
+  ],
+  "estimator": "deterministic_char_heuristic_v0.1",
+  "guardrails": {
+    "contains_llm_inference": false,
+    "deterministic_estimates_only": true,
+    "filesystem_io_not_performed": true,
+    "model_specific_tokenizer_not_used": true,
+    "raw_payloads_not_embedded": true
+  },
+  "max_token_reduction_percent": 4.29,
+  "profiles": {
+    "compact": {
+      "baseline_token_ratio_to_source": {
+        "mesh_context_report": 0.9571,
+        "serialized_graph_payload": 0.0185
+      },
+      "baseline_token_reduction_percent": {
+        "mesh_context_report": 4.29,
+        "serialized_graph_payload": 98.15
+      },
+      "estimated_input_tokens": 691,
+      "estimated_json_chars": 2761,
+      "estimated_output_tokens": 0,
+      "estimated_source_report_tokens": 722,
+      "estimated_token_reduction_percent": 4.29,
+      "hotspot_retention_percent": 100.0,
+      "included_evidence_edge_count": 0,
+      "included_evidence_node_count": 0,
+      "included_hotspots_count": 0,
+      "included_risk_candidate_count": 0,
+      "omitted_sections": [
+        "full_raw_edge_listing",
+        "full_raw_node_listing",
+        "raw_source_files"
+      ],
+      "profile": "compact",
+      "risk_candidate_retention_percent": 100.0,
+      "token_ratio_to_source": 0.9571,
+      "total_hotspots_count": 0,
+      "total_risk_candidate_count": 0,
+      "truncated_sections": []
+    }
+  },
+  "schema_version": "mesh_context_token_benchmark.v0.1",
+  "source_baselines": {
+    "mesh_context_report": {
+      "embeds_raw_payload": false,
+      "estimated_tokens": 722,
+      "json_chars": 2885
+    },
+    "serialized_graph_payload": {
+      "embeds_raw_payload": false,
+      "estimated_tokens": 37256,
+      "json_chars": 149021
+    }
+  },
+  "source_report_json_chars": 2885,
+  "source_report_schema_version": "0.1.0",
+  "source_report_tokens": 722
+}

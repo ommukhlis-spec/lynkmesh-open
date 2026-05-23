@@ -1,0 +1,48 @@
+{
+  "schema_version": "before_after_metrics.v0.1",
+  "evaluation_mode": "after_with_lynkmesh",
+  "scenario_id": "architecture_impact_baseline",
+  "run_id": "mini_auth_shop_php_001",
+  "recorded_at": null,
+  "reviewer": null,
+  "is_benchmark_proof": false,
+  "lynkmesh_used": true,
+  "target_project_category": "Synthetic PHP MVC auth+shop fixture",
+  "environment": {
+    "os": null,
+    "python_version": null,
+    "ai_model": null,
+    "ai_client": null,
+    "lynkmesh_version": null
+  },
+  "metrics": {
+    "manual_context_prep_minutes": null,
+    "files_opened_manually": null,
+    "context_tokens_supplied": null,
+    "time_to_first_useful_answer_seconds": null,
+    "iterations_to_answer": null,
+    "used_deterministic_evidence": null,
+    "grounding": {
+      "claims_made": null,
+      "claims_supported_by_evidence": null,
+      "unsupported_claims": null
+    },
+    "correctness": {
+      "architecture_findings_correct": null,
+      "architecture_findings_total": null
+    }
+  },
+  "notes": "Stage 4.7.0C refresh: deterministic CLI artifacts now include PHP language metadata and deterministic entrypoint candidates. AI transcript, screenshots, human correctness scoring, and unsupported-assumption counts remain pending_manual_capture.\nManual AFTER capture completed with Claude Haiku 4.5 fresh chat using LynkMesh artifacts only. Expanded pack provided deterministic graph evidence with 61 nodes and 99 edges, 2 entrypoint candidates, and no LLM inference. Transcript shows graph-level reasoning and explicit uncertainty; semantic labels remain UUID-heavy. Not benchmark proof.",
+  "disclaimers": [
+    "Evaluation baseline, not benchmark proof.",
+    "pending_manual_capture: deterministic artifacts and AI transcript not yet generated/recorded.",
+    "LynkMesh provides deterministic evidence; AI reasoning happens above the evidence layer.",
+    "Any favorable result supports only a narrow, conditional claim subject to evaluation."
+  ],
+  "manual_capture_status": "captured",
+  "manual_input_mode": "lynkmesh_artifacts_only",
+  "raw_source_files_available_to_model": false,
+  "expanded_evidence_nodes_count": 61,
+  "expanded_evidence_edges_count": 99,
+  "entrypoints_count": 2
+}

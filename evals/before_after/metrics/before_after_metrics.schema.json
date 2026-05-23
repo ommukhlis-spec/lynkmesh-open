@@ -1,0 +1,131 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "lynkmesh/evals/before_after/before_after_metrics.schema.json",
+  "title": "LynkMesh Before/After Evaluation Run Metrics",
+  "description": "Schema for a single evaluation run (one arm) in the before/after baseline. Evaluation baseline only; not benchmark proof. Metrics are human-recorded and not generalizable.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evaluation_mode",
+    "scenario_id",
+    "run_id",
+    "is_benchmark_proof",
+    "environment",
+    "metrics"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "before_after_metrics.v0.1"
+    },
+    "evaluation_mode": {
+      "type": "string",
+      "enum": ["before_without_lynkmesh", "after_with_lynkmesh"]
+    },
+    "scenario_id": {
+      "type": "string",
+      "description": "Scenario identifier, e.g. architecture_impact_baseline."
+    },
+    "run_id": {
+      "type": "string",
+      "description": "Identifier pairing the before and after arms of one comparison."
+    },
+    "recorded_at": {
+      "type": ["string", "null"],
+      "description": "ISO 8601 timestamp, or null."
+    },
+    "reviewer": {
+      "type": ["string", "null"],
+      "description": "Reviewer initials/role. No personal data."
+    },
+    "is_benchmark_proof": {
+      "type": "boolean",
+      "const": false,
+      "description": "Always false. This is an evaluation baseline, not proof."
+    },
+    "lynkmesh_used": {
+      "type": "boolean",
+      "description": "True only for the after_with_lynkmesh arm."
+    },
+    "target_project_category": {
+      "type": ["string", "null"],
+      "description": "Sanitized category label, never a private project name."
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "python_version", "ai_model", "lynkmesh_version"],
+      "properties": {
+        "os": { "type": ["string", "null"] },
+        "python_version": { "type": ["string", "null"] },
+        "ai_model": { "type": ["string", "null"] },
+        "ai_client": { "type": ["string", "null"] },
+        "lynkmesh_version": {
+          "type": ["string", "null"],
+          "description": "Null in the before arm; CLI version in the after arm."
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "manual_context_prep_minutes": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Wall-clock minutes the agent/reviewer spent gathering context manually."
+        },
+        "files_opened_manually": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "context_tokens_supplied": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Approximate context tokens supplied to the model."
+        },
+        "time_to_first_useful_answer_seconds": {
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "iterations_to_answer": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Number of agent turns/iterations to reach a useful answer."
+        },
+        "used_deterministic_evidence": {
+          "type": ["boolean", "null"],
+          "description": "Whether LynkMesh deterministic artifacts were used as grounding."
+        },
+        "grounding": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "claims_made": { "type": ["integer", "null"], "minimum": 0 },
+            "claims_supported_by_evidence": { "type": ["integer", "null"], "minimum": 0 },
+            "unsupported_claims": { "type": ["integer", "null"], "minimum": 0 }
+          }
+        },
+        "correctness": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Scored against a separate human-reviewed answer key.",
+          "properties": {
+            "architecture_findings_correct": { "type": ["integer", "null"], "minimum": 0 },
+            "architecture_findings_total": { "type": ["integer", "null"], "minimum": 0 }
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": ["string", "null"],
+      "description": "Deviations from method or context. Public-safe text only."
+    },
+    "disclaimers": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Scope/limitation statements attached to this run."
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "schema_version": "before_after_metrics.v0.1",
+  "evaluation_mode": "before_without_lynkmesh",
+  "scenario_id": "architecture_impact_baseline",
+  "run_id": "mini_auth_shop_php_001",
+  "recorded_at": null,
+  "reviewer": null,
+  "is_benchmark_proof": false,
+  "lynkmesh_used": false,
+  "target_project_category": "Synthetic PHP MVC auth+shop fixture",
+  "environment": {
+    "os": null,
+    "python_version": null,
+    "ai_model": null,
+    "ai_client": null,
+    "lynkmesh_version": null
+  },
+  "metrics": {
+    "manual_context_prep_minutes": null,
+    "files_opened_manually": null,
+    "context_tokens_supplied": null,
+    "time_to_first_useful_answer_seconds": null,
+    "iterations_to_answer": null,
+    "used_deterministic_evidence": false,
+    "grounding": {
+      "claims_made": null,
+      "claims_supported_by_evidence": null,
+      "unsupported_claims": null
+    },
+    "correctness": {
+      "architecture_findings_correct": null,
+      "architecture_findings_total": null
+    }
+  },
+  "notes": "pending_manual_capture: no measured values yet. The BEFORE arm requires a real model run with manual context gathering against the fixture. Null fields are unmeasured, not zero.\nManual BEFORE capture completed with Claude Haiku 4.5 fresh chat using raw fixture zip only. Transcript shows detailed source-level semantic analysis, named components, and line-level evidence. LynkMesh artifacts were not used. Not benchmark proof.",
+  "disclaimers": [
+    "Evaluation baseline, not benchmark proof.",
+    "pending_manual_capture: AI transcript and measured metrics not yet recorded.",
+    "Single run does not generalize across projects, models, or reviewers."
+  ],
+  "manual_capture_status": "captured",
+  "manual_input_mode": "raw_fixture_zip",
+  "raw_source_files_available_to_model": true
+}

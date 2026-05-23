@@ -27,11 +27,37 @@ SUPPORTED_MESH_CONTEXT_AI_PACK_PROFILES = ("compact", "balanced", "expanded")
 _UNKNOWN = "unknown"
 _REDACTED = "__unsafe_redacted__"
 
+# Node types whose human-readable label is best expressed as ``Owner::member``
+# (e.g. ``App\\Services\\AuthService::attempt``) when an owning class/scope is
+# deterministically present in the node metadata.
+_METHOD_LIKE_TYPES = frozenset(
+    {"method", "function", "func", "closure", "lambda", "property", "constant"}
+)
+
 _WINDOWS_ABSOLUTE_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
 _UNC_PATH_RE = re.compile(r"^\\\\")
 _POSIX_PRIVATE_PATH_RE = re.compile(
     r"^/(?:home|Users|mnt|private|tmp|var|etc|root)(?:/|$)",
     re.IGNORECASE,
+)
+
+# Deterministic relativization anchors. Absolute serializer paths frequently
+# embed a safe project-relative suffix; we recover it (dropping the private
+# prefix) so evidence stays readable without ever emitting an absolute or
+# private path. The fixtures marker is most specific and checked first; the
+# generic anchors are matched at a path-segment boundary (leading "/").
+_FIXTURES_PATH_MARKER = "/evals/before_after/fixtures/"
+_SAFE_PATH_ANCHORS: tuple[str, ...] = (
+    "/app/",
+    "/routes/",
+    "/public/",
+    "/config/",
+    "/src/",
+    "/lib/",
+    "/test/",
+    "/tests/",
+    "/resources/",
+    "/database/",
 )
 
 _PROFILE_LIMITS: dict[str, dict[str, int]] = {
@@ -124,7 +150,7 @@ class MeshContextAIContextPack:
         return asdict(self)
 
 
-def build_mesh_context_ai_pack(report: Any, profile: str = "compact") -> dict[str, Any]:
+def build_mesh_context_ai_pack(report: Any, profile: str = "compact", *, graph_source: Any = None) -> dict[str, Any]:
     """Build a deterministic AI-ready context pack from a MeshContext Report.
 
     The builder accepts partial synthetic fixtures as well as richer report
@@ -138,10 +164,12 @@ def build_mesh_context_ai_pack(report: Any, profile: str = "compact") -> dict[st
         raise ValueError(f"Unsupported MeshContext AI pack profile: {profile!r}. Supported: {supported}")
 
     payload = _to_plain(report)
+    graph_payload = _to_plain(graph_source) if graph_source is not None else payload
+    evidence_payload = payload if profile == "compact" else graph_payload
     limits = _PROFILE_LIMITS[profile]
 
     nodes = _extract_collection(
-        payload,
+        evidence_payload,
         (
             "nodes",
             "nodes_by_uuid",
@@ -154,7 +182,7 @@ def build_mesh_context_ai_pack(report: Any, profile: str = "compact") -> dict[st
         ),
     )
     edges = _extract_collection(
-        payload,
+        evidence_payload,
         (
             "edges",
             "edges_by_uuid",
@@ -616,88 +644,462 @@ def _build_context_items(
 
 def _build_evidence_index(
     *,
-    nodes: Sequence[Any],
-    edges: Sequence[Any],
+    nodes: list[dict[str, Any]],
+    edges: list[dict[str, Any]],
     profile: str,
     node_limit: int,
     edge_limit: int,
 ) -> dict[str, Any]:
-    indexed_nodes: dict[str, Any] = {}
-    for record in _stable_record_order(nodes):
-        if len(indexed_nodes) >= node_limit:
-            break
-        item = _build_evidence_item(record, kind="node")
-        if item is not None:
-            indexed_nodes[item["id"]] = item
+    """Build bounded sanitized evidence records for downstream citation.
 
-    indexed_edges: dict[str, Any] = {}
-    for record in _stable_record_order(edges):
-        if len(indexed_edges) >= edge_limit:
-            break
-        item = _build_evidence_item(record, kind="edge")
-        if item is not None:
-            indexed_edges[item["id"]] = item
+    Compact profile intentionally remains aggregate-first. Richer profiles may
+    receive node/edge records from a deterministic graph source supplied by the
+    caller.
+    """
+    selected_nodes = _stable_record_order(nodes)[: max(0, node_limit)]
+    node_items: dict[str, dict[str, Any]] = {}
 
-    sections = {
-        "executive_context": {
-            "id": "section:executive_context",
-            "kind": "section",
-            "reason": "compact_project_summary",
-        },
-        "architecture_context": {
-            "id": "section:architecture_context",
-            "kind": "section",
-            "reason": "high_signal_architecture_context",
-        },
-        "hotspot_context": {
-            "id": "section:hotspot_context",
-            "kind": "section",
-            "reason": "ranked_hotspot_candidates",
-        },
-        "risk_context": {
-            "id": "section:risk_context",
-            "kind": "section",
-            "reason": "ranked_risk_candidates",
-        },
-    }
+    # Map raw per-build identifiers (uuid/id) onto the stable evidence id so
+    # edge endpoints resolve to the same nodes and can reuse their readable
+    # labels.  This is built purely from node evidence — never guessed.
+    raw_to_evidence_id: dict[str, str] = {}
+    label_by_evidence_id: dict[str, str] = {}
 
-    return _sort_mapping(
-        {
-            "nodes": indexed_nodes,
-            "edges": indexed_edges,
-            "sections": sections,
-            "profile": profile,
+    for record in selected_nodes:
+        item = _build_evidence_item(record, "node")
+        if not item:
+            continue
+        evidence_id = str(item["id"])
+        node_items[evidence_id] = item
+        label = item.get("label")
+        if isinstance(label, str):
+            label_by_evidence_id[evidence_id] = label
+        if isinstance(record, Mapping):
+            for key in ("uuid", "id", "node_id", "stable_id"):
+                raw = record.get(key)
+                if raw is not None:
+                    raw_to_evidence_id.setdefault(str(raw), evidence_id)
+
+    selected_node_ids = set(node_items)
+
+    def endpoint_id(value: Any) -> str:
+        if value is None:
+            return _UNKNOWN
+        mapped = raw_to_evidence_id.get(str(value))
+        if mapped:
+            return mapped
+        safe = _safe_identifier(str(value))
+        if not safe:
+            return _UNKNOWN
+        return _prefixed_id(safe, "node")
+
+    def enrich_edge(record: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(record, Mapping):
+            return {}
+        meta = _evidence_metadata(record)
+        source = endpoint_id(
+            _first_record_value(
+                record,
+                (
+                    "source",
+                    "source_uuid",
+                    "source_id",
+                    "source_node",
+                    "from",
+                    "from_uuid",
+                    "src",
+                    "src_uuid",
+                ),
+            )
+        )
+        target = endpoint_id(
+            _first_record_value(
+                record,
+                (
+                    "target",
+                    "target_uuid",
+                    "target_id",
+                    "target_node",
+                    "to",
+                    "to_uuid",
+                    "dst",
+                    "dst_uuid",
+                ),
+            )
+        )
+        edge_type = _safe_scalar(
+            _first_record_value(
+                meta,
+                ("type", "edge_type", "relation", "relationship", "semantic", "kind"),
+                _UNKNOWN,
+            )
+        )
+        confidence = _safe_scalar(
+            _first_record_value(
+                meta,
+                ("confidence", "confidence_class", "confidence_str", "score"),
+                _UNKNOWN,
+            )
+        )
+        evidence_id = _stable_edge_id(record, source, target, edge_type)
+        if not evidence_id:
+            return {}
+        item = {
+            "id": evidence_id,
+            "kind": "edge",
+            "source": source,
+            "target": target,
+            "type": edge_type,
+            "confidence": confidence,
+            "label": edge_type if edge_type != _UNKNOWN else evidence_id,
+            "reason": "selected_from_edge_evidence_index",
         }
-    )
+        # Endpoint labels are taken only from the deterministic node evidence
+        # map; unresolved endpoints simply omit the label.
+        source_label = label_by_evidence_id.get(source)
+        if source_label is not None:
+            item["source_label"] = source_label
+        target_label = label_by_evidence_id.get(target)
+        if target_label is not None:
+            item["target_label"] = target_label
+        return _sort_mapping(_sanitize_value(item))
 
+    edge_items: dict[str, dict[str, Any]] = {}
+    ordered_edges = _stable_record_order(edges)
+
+    # Prefer internally consistent edges whose endpoints are both present in the
+    # selected node evidence set.
+    for record in ordered_edges:
+        if len(edge_items) >= max(0, edge_limit):
+            break
+        item = enrich_edge(record)
+        if not item:
+            continue
+        if item.get("source") in selected_node_ids and item.get("target") in selected_node_ids:
+            edge_items[str(item["id"])] = item
+
+    # Fill any remaining budget with deterministic sanitized edges. This keeps
+    # evidence useful even when endpoint identifiers use a different serializer
+    # field than the selected node ids.
+    for record in ordered_edges:
+        if len(edge_items) >= max(0, edge_limit):
+            break
+        item = enrich_edge(record)
+        if not item:
+            continue
+        edge_items.setdefault(str(item["id"]), item)
+
+    return {
+        "profile": profile,
+        "nodes": _sort_mapping(node_items),
+        "edges": _sort_mapping(edge_items),
+    }
 
 def _build_evidence_item(record: Any, kind: str) -> dict[str, Any] | None:
     if not isinstance(record, Mapping):
         return None
-    raw_id = _record_id(record)
-    safe_id = _safe_identifier(raw_id)
-    if not safe_id:
+    meta = _evidence_metadata(record)
+    evidence_id = _stable_evidence_id(record, meta, kind)
+    if not evidence_id:
         return None
-    evidence_id = safe_id if str(safe_id).startswith(f"{kind}:") else f"{kind}:{safe_id}"
     item = {
         "id": evidence_id,
         "kind": kind,
-        "label": _safe_scalar(
-            _first_record_value(record, ("label", "name", "display_name", "symbol", "id"), evidence_id)
-        ),
+        "label": _evidence_label(meta, kind, evidence_id),
         "type": _safe_scalar(
             _first_record_value(
-                record,
-                ("type", f"{kind}_type", "kind", "category", "relation", "relationship"),
+                meta,
+                ("type", f"{kind}_type", "kind", "category", "relation", "relationship", "semantic"),
                 _UNKNOWN,
             )
         ),
         "confidence": _safe_scalar(
-            _first_record_value(record, ("confidence", "confidence_class", "score"), _UNKNOWN)
+            _first_record_value(
+                meta,
+                ("confidence", "confidence_class", "confidence_str", "score"),
+                _UNKNOWN,
+            )
         ),
         "reason": f"selected_from_{kind}_evidence_index",
     }
+    if kind == "node":
+        qualified = _first_record_value(meta, ("qualified_name", "fqcn"))
+        if qualified is not None:
+            qualified_safe = _safe_scalar(str(qualified))
+            if qualified_safe != _REDACTED:
+                item["qualified_name"] = qualified_safe
+        path = _node_path(meta)
+        if path is not None:
+            item["path"] = path
     return _sort_mapping(_sanitize_value(item))
+
+
+def _evidence_metadata(record: Mapping[str, Any]) -> dict[str, Any]:
+    """Flatten deterministic node/edge metadata into one lookup view.
+
+    Canonical serializer payloads nest semantic fields under ``identity`` (and
+    a method/function's owning class under ``identity.extra.class``), whereas
+    synthetic fixtures and report records expose the same fields at the top
+    level.  Top-level keys take precedence so an explicit record field is never
+    shadowed by an identity-derived one.  No values are inferred here.
+    """
+    meta: dict[str, Any] = {}
+    if not isinstance(record, Mapping):
+        return meta
+    identity = record.get("identity")
+    if isinstance(identity, Mapping):
+        extra = identity.get("extra")
+        if isinstance(extra, Mapping):
+            for key, value in extra.items():
+                meta[str(key)] = value
+        for key, value in identity.items():
+            if key == "extra":
+                continue
+            meta[str(key)] = value
+    for key, value in record.items():
+        if key == "identity":
+            continue
+        meta[str(key)] = value
+    return meta
+
+
+
+def _safe_relative_path(value: Any) -> str | None:
+    """Derive a safe project-relative path from serializer path metadata.
+
+    Absolute serializer paths may include private machine prefixes. This helper
+    only returns a relative suffix when it can be derived deterministically from
+    public-safe fixture/project anchors. Otherwise callers should redact.
+    """
+    if value is None:
+        return None
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    normalized = text.replace("\\", "/")
+
+    def accept(candidate: str) -> str | None:
+        candidate = candidate.replace("\\", "/").lstrip("/")
+        if not candidate or candidate in (".", ".."):
+            return None
+        if candidate.startswith("../") or "/../" in f"/{candidate}/":
+            return None
+        if _WINDOWS_ABSOLUTE_PATH_RE.match(candidate):
+            return None
+        if _UNC_PATH_RE.match(candidate):
+            return None
+        sanitized = _sanitize_value(candidate)
+        if sanitized == candidate and sanitized != _REDACTED:
+            return candidate
+        return None
+
+    marker_index = normalized.find(_FIXTURES_PATH_MARKER)
+    if marker_index >= 0:
+        after_marker = normalized[marker_index + len(_FIXTURES_PATH_MARKER):]
+        parts = [part for part in after_marker.split("/") if part]
+        if len(parts) >= 2:
+            candidate = "/".join(parts[1:])
+            accepted = accept(candidate)
+            if accepted:
+                return accepted
+
+    best: str | None = None
+    for anchor in _SAFE_PATH_ANCHORS:
+        idx = normalized.find(anchor)
+        if idx < 0:
+            continue
+        candidate = normalized[idx + 1 :]
+        accepted = accept(candidate)
+        if accepted and (best is None or len(accepted) < len(best)):
+            best = accepted
+    if best:
+        return best
+
+    return accept(normalized)
+
+
+def _evidence_label(meta: Mapping[str, Any], kind: str, fallback: str) -> str:
+    """Pick a deterministic, sanitized human-readable label from metadata."""
+    if kind == "node":
+        node_type = _lower(
+            _first_record_value(meta, ("type", "node_type", "kind", "category"), "")
+        )
+
+        # File nodes are special: serializers often store their name/label/path
+        # as an absolute path. Prefer a safely relativized path before generic
+        # scalar sanitization, otherwise the absolute path is redacted and the
+        # readable fixture-relative label is lost.
+        if node_type == "file":
+            raw_seen = False
+            for key in (
+                "path",
+                "file_path",
+                "relative_path",
+                "file",
+                "source_path",
+                "source_file",
+                "label",
+                "name",
+                "symbol",
+            ):
+                value = meta.get(key)
+                if value:
+                    raw_seen = True
+                    relative = _safe_relative_path(value)
+                    if relative:
+                        return relative
+            return _REDACTED if raw_seen else fallback
+
+        name = _first_record_value(meta, ("name", "label", "symbol"))
+        owner = _first_record_value(
+            meta, ("class", "owner_class", "owner", "parent_class", "declaring_class")
+        )
+        if name and owner and node_type in _METHOD_LIKE_TYPES:
+            return _safe_scalar(f"{owner}::{name}")
+
+        for key in ("label", "name", "qualified_name", "fqcn", "symbol"):
+            value = meta.get(key)
+            if value:
+                safe = _safe_scalar(str(value))
+                if safe != _REDACTED:
+                    return safe
+
+        for key in (
+            "path",
+            "file_path",
+            "relative_path",
+            "file",
+            "source_path",
+            "source_file",
+        ):
+            value = meta.get(key)
+            if value:
+                relative = _safe_relative_path(value)
+                if relative:
+                    return relative
+                safe = _safe_scalar(str(value).replace("\\", "/"))
+                if safe != _REDACTED:
+                    return safe
+        return fallback
+
+    for key in ("label", "name", "type", "edge_type", "relation", "relationship", "semantic"):
+        value = meta.get(key)
+        if value:
+            return _safe_scalar(str(value))
+    return fallback
+
+def _node_path(meta: Mapping[str, Any]) -> str | None:
+    """Return a forward-slash normalized, sanitized node path when present.
+
+    Absolute serializer paths are relativized to a safe project-relative suffix
+    when possible; otherwise the value is redacted.
+    """
+    raw = _first_record_value(
+        meta,
+        ("path", "file_path", "relative_path", "file", "source_path", "source_file"),
+    )
+    if raw is None:
+        return None
+    relative = _safe_relative_path(raw)
+    if relative is not None:
+        return relative
+    return _sanitize_value(str(raw).replace("\\", "/"))
+
+
+def _stable_evidence_id(record: Mapping[str, Any], meta: Mapping[str, Any], kind: str) -> str | None:
+    """Derive a deterministic evidence id, preferring stable metadata over UUID.
+
+    Ordering:
+      1. an explicit deterministic identifier (id/<kind>_id/stable_id) — keeps
+         report-driven and compact evidence stable and consistent with
+         hotspot/risk ``evidence_ids`` cross-references;
+      2. for nodes, a label derived from deterministic metadata
+         (type + qualified_name | path | label), so rebuilds with fresh
+         per-build UUIDs resolve to the same evidence id;
+      3. the per-build UUID, only as a last resort.
+    """
+    for key in ("id", f"{kind}_id", "stable_id"):
+        safe = _safe_identifier(record.get(key))
+        if safe:
+            return _prefixed_id(safe, kind)
+
+    if kind == "node":
+        node_type = _lower(
+            _first_record_value(meta, ("type", "node_type", "kind", "category"), "")
+        )
+        name = _first_record_value(meta, ("name", "label", "symbol"))
+        owner = _first_record_value(
+            meta, ("class", "owner_class", "owner", "parent_class", "declaring_class")
+        )
+        if name and owner and node_type in _METHOD_LIKE_TYPES:
+            token = _safe_identifier(_id_token(f"{owner}::{name}"))
+            if token:
+                return _prefixed_id(_join_type(node_type, token), kind)
+        for key in (
+            "qualified_name",
+            "fqcn",
+            "path",
+            "file_path",
+            "relative_path",
+            "label",
+            "name",
+            "symbol",
+        ):
+            value = meta.get(key)
+            if not value:
+                continue
+            if key in ("path", "file_path", "relative_path"):
+                # Derive a stable id from the safe relative path so file nodes
+                # avoid the volatile per-build UUID fallback when possible.
+                value = _safe_relative_path(value)
+                if value is None:
+                    continue
+            token = _safe_identifier(_id_token(value))
+            if token:
+                return _prefixed_id(_join_type(node_type, token), kind)
+
+    for key in ("uuid", "id", f"{kind}_id"):
+        safe = _safe_identifier(record.get(key))
+        if safe:
+            return _prefixed_id(safe, kind)
+    return None
+
+
+def _stable_edge_id(record: Mapping[str, Any], source: str, target: str, edge_type: str) -> str | None:
+    """Derive a deterministic edge id from stable endpoints + type, then UUID."""
+    for key in ("id", "edge_id", "stable_id"):
+        safe = _safe_identifier(record.get(key))
+        if safe:
+            return _prefixed_id(safe, "edge")
+    if source != _UNKNOWN and target != _UNKNOWN:
+        token = _safe_identifier(_id_token(f"{source}->{target}:{edge_type}"))
+        if token:
+            return _prefixed_id(token, "edge")
+    safe = _safe_identifier(record.get("uuid"))
+    if safe:
+        return _prefixed_id(safe, "edge")
+    return None
+
+
+def _id_token(value: Any) -> str:
+    return str(value).replace("\\", "/")
+
+
+def _join_type(node_type: str, token: str) -> str:
+    if node_type and node_type != _UNKNOWN:
+        return f"{node_type}:{token}"
+    return token
+
+
+def _prefixed_id(token: Any, kind: str) -> str:
+    text = str(token)
+    return text if text.startswith(f"{kind}:") else f"{kind}:{text}"
+
+
+def _lower(value: Any) -> str:
+    return str(value or "").lower()
 
 
 def _build_omissions(

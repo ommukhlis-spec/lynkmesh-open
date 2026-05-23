@@ -1,0 +1,41 @@
+{
+  "schema_version": "before_after_metrics.v0.1",
+  "evaluation_mode": "before_without_lynkmesh",
+  "scenario_id": "architecture_impact_baseline",
+  "run_id": "ILLUSTRATIVE-EXAMPLE-not-a-real-run",
+  "recorded_at": null,
+  "reviewer": "EXAMPLE",
+  "is_benchmark_proof": false,
+  "lynkmesh_used": false,
+  "target_project_category": "Legacy PHP administrative system (example)",
+  "environment": {
+    "os": "EXAMPLE-OS",
+    "python_version": "3.11.x",
+    "ai_model": "EXAMPLE-MODEL",
+    "ai_client": "EXAMPLE-CLIENT",
+    "lynkmesh_version": null
+  },
+  "metrics": {
+    "manual_context_prep_minutes": 0,
+    "files_opened_manually": 0,
+    "context_tokens_supplied": 0,
+    "time_to_first_useful_answer_seconds": 0,
+    "iterations_to_answer": 0,
+    "used_deterministic_evidence": false,
+    "grounding": {
+      "claims_made": 0,
+      "claims_supported_by_evidence": 0,
+      "unsupported_claims": 0
+    },
+    "correctness": {
+      "architecture_findings_correct": 0,
+      "architecture_findings_total": 0
+    }
+  },
+  "notes": "ILLUSTRATIVE PLACEHOLDER VALUES ONLY. This file is a template example, not a measured result. Replace all values with real recorded data before use.",
+  "disclaimers": [
+    "Evaluation baseline, not benchmark proof.",
+    "Illustrative placeholder values; not a real run.",
+    "Single run does not generalize across projects, models, or reviewers."
+  ]
+}

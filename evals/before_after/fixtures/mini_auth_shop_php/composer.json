@@ -1,0 +1,13 @@
+{
+  "name": "lynkmesh/eval-mini-auth-shop-php",
+  "description": "Synthetic PHP MVC fixture for LynkMesh before/after evaluation.",
+  "type": "project",
+  "autoload": {
+    "psr-4": {
+      "MiniAuthShop\\": "app/"
+    }
+  },
+  "require": {
+    "php": ">=8.1"
+  }
+}

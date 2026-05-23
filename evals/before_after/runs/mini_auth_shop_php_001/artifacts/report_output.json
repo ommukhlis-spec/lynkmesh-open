@@ -1,0 +1,132 @@
+{
+  "build": {
+    "build_duration_seconds": null,
+    "build_id": "e84b24f9-5fa9-40ea-8ee1-4ea98bcda925",
+    "content_hash": "33047cf48b3a7b8bfe81447579e7404ba23ae8deb7a1ef111b03cf36753687fc",
+    "git_commit": null,
+    "graph_id": "bd64c3c9-1953-5e3a-a89d-d37e8a3793f0",
+    "parser_executor_mode": null,
+    "parser_source": null,
+    "pipeline_schema_version": "3.4.0",
+    "serializer_schema_version": "3.1.0"
+  },
+  "dependency_summary": {
+    "cross_layer_candidates": [],
+    "cycles_detected": 0,
+    "layer_edges": [],
+    "layers": []
+  },
+  "entrypoints": [
+    {
+      "confidence": "HEURISTIC",
+      "evidence": "deterministic_path_candidate",
+      "kind": "php_front_controller",
+      "path": "public/index.php",
+      "reason": "Conventional PHP front controller."
+    },
+    {
+      "confidence": "HEURISTIC",
+      "evidence": "deterministic_path_candidate",
+      "kind": "php_routes_file",
+      "path": "routes/web.php",
+      "reason": "Conventional PHP web routes file."
+    }
+  ],
+  "generated_at": "2026-05-22T14:58:53.918361+00:00",
+  "graph_facts": {
+    "confidence_distribution": {
+      "EXACT": 0,
+      "EXTERNAL": 0,
+      "FRAMEWORK": 0,
+      "HEURISTIC": 0,
+      "PROPAGATED": 0,
+      "UNKNOWN": 0
+    },
+    "edge_count": 99,
+    "edge_type_breakdown": {},
+    "node_count": 61,
+    "node_type_breakdown": {
+      "class": 12,
+      "external": 0,
+      "file": 15,
+      "function": 0,
+      "method": 34
+    }
+  },
+  "hotspots": [],
+  "languages": {
+    "mix": {
+      "php": 15
+    },
+    "primary": "php",
+    "supported": [
+      "php"
+    ]
+  },
+  "limitations": [
+    "Semantic analysis is limited to supported parser capabilities.",
+    "Dynamic dispatch resolution may be incomplete.",
+    "Heuristic and propagated facts should be down-weighted.",
+    "Entrypoints, hotspots, and risk candidates are deterministic candidates, not validated conclusions.",
+    "The report reflects source state at build time, not runtime execution."
+  ],
+  "llm_instructions": {
+    "allowed_inferences": [
+      "architecture narrative",
+      "domain naming",
+      "recommendations",
+      "risk communication"
+    ],
+    "confidence_policy": "Down-weight HEURISTIC and PROPAGATED facts.",
+    "forbidden": [
+      "inventing edges",
+      "treating candidates as confirmed defects",
+      "claiming runtime behavior from static graph facts"
+    ],
+    "role": "Interpret deterministic facts; do not invent graph relationships.",
+    "token_policy": "Reference compact node identifiers instead of restating large node lists."
+  },
+  "project": {
+    "display_name": "mini_auth_shop_php",
+    "languages": {
+      "php": 15
+    },
+    "primary_language": "php"
+  },
+  "provenance": {
+    "contains_llm_inference": false,
+    "generator": "lynkmesh",
+    "generator_version": "unknown (source checkout)",
+    "graph_content_hash": "33047cf48b3a7b8bfe81447579e7404ba23ae8deb7a1ef111b03cf36753687fc",
+    "is_deterministic": true,
+    "sections": {
+      "dependency_summary": {
+        "deterministic": true,
+        "engine": "conservative_empty_v0_1"
+      },
+      "entrypoints": {
+        "deterministic": true,
+        "engine": "not_populated_v0_1"
+      },
+      "graph_facts": {
+        "deterministic": true,
+        "engine": "graph_serializer"
+      },
+      "hotspots": {
+        "deterministic": true,
+        "engine": "not_populated_v0_1"
+      },
+      "languages": {
+        "deterministic": true,
+        "engine": "mesh_context_projection"
+      },
+      "risk_candidates": {
+        "deterministic": true,
+        "engine": "not_populated_v0_1"
+      }
+    }
+  },
+  "report_type": "mesh_context_report",
+  "risk_candidates": [],
+  "schema_version": "0.1.0"
+}

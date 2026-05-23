@@ -1,0 +1,122 @@
+{
+  "schema_version": "manual_before_after_capture.v0.1",
+  "generated_at_utc": "2026-05-23T06:05:59.247984Z",
+  "run_id": "mini_auth_shop_php_001",
+  "is_benchmark_proof": false,
+  "model_setup": {
+    "before": {
+      "model": "Claude Haiku 4.5",
+      "chat_context": "fresh chat",
+      "input_material": "raw fixture zip only",
+      "lynkmesh_artifacts_used": false,
+      "raw_source_files_available": true
+    },
+    "after": {
+      "model": "Claude Haiku 4.5",
+      "chat_context": "fresh chat",
+      "input_material": [
+        "artifacts/report_output.json",
+        "artifacts/pack_expanded_output.json",
+        "artifacts/benchmark_all_profiles_output.json"
+      ],
+      "lynkmesh_artifacts_used": true,
+      "raw_source_files_available": false
+    }
+  },
+  "captured_files": {
+    "before_transcripts": [
+      "transcripts/before/ARCHITECTURE_ANALYSIS.md",
+      "transcripts/before/CODE_EVIDENCE.md",
+      "transcripts/before/DEPENDENCY_GRAPH.md",
+      "transcripts/before/SUMMARY.md"
+    ],
+    "after_transcripts": [
+      "transcripts/after/CLAUDE_AFTER_EXPANDED_ARTIFACT_ANALYSIS.md"
+    ],
+    "screenshots": [
+      "screenshots/01_before_raw_files_uploaded.png",
+      "screenshots/02_before_raw_file_analysis_summary.png",
+      "screenshots/03_after_artifacts_uploaded.png",
+      "screenshots/04_after_graph_evidence_view.png",
+      "screenshots/05_after_uncertainty_guardrails.png"
+    ]
+  },
+  "artifact_measurements": {
+    "report_project": {
+      "display_name": "mini_auth_shop_php",
+      "languages": {
+        "php": 15
+      },
+      "primary_language": "php"
+    },
+    "report_languages": {
+      "mix": {
+        "php": 15
+      },
+      "primary": "php",
+      "supported": [
+        "php"
+      ]
+    },
+    "entrypoints_count": 2,
+    "entrypoints": [
+      {
+        "confidence": "HEURISTIC",
+        "evidence": "deterministic_path_candidate",
+        "kind": "php_front_controller",
+        "path": "public/index.php",
+        "reason": "Conventional PHP front controller."
+      },
+      {
+        "confidence": "HEURISTIC",
+        "evidence": "deterministic_path_candidate",
+        "kind": "php_routes_file",
+        "path": "routes/web.php",
+        "reason": "Conventional PHP web routes file."
+      }
+    ],
+    "expanded_evidence_nodes_count": 61,
+    "expanded_evidence_edges_count": 99,
+    "contains_llm_inference": false,
+    "profiles_in_benchmark": [
+      "balanced",
+      "compact",
+      "expanded"
+    ]
+  },
+  "manual_observations": {
+    "before": {
+      "summary": "Claude produced detailed semantic architecture analysis from raw source files, including named auth/product components, central services, impact tiers, and line-level evidence.",
+      "observable_terms": {
+        "AuthService": 141,
+        "AuthController": 35,
+        "AccountController": 31,
+        "AuthMiddleware": 37,
+        "UserRepository": 29,
+        "SessionService": 36,
+        "AuditLogService": 26,
+        "ProductRepository": 54,
+        "ProductController": 35
+      },
+      "strength": "high semantic detail because raw source files were available",
+      "cost_or_requirement": "required user to upload raw project files and allowed manual source inspection"
+    },
+    "after": {
+      "summary": "Claude used LynkMesh artifacts only and reasoned from deterministic graph evidence, including entrypoints, node/edge counts, centrality, and uncertainty boundaries.",
+      "observable_terms": {
+        "deterministic": 6,
+        "evidence_index": 0,
+        "node:": 21,
+        "edge:": 0,
+        "uncertainty": 0,
+        "unsupported": 0,
+        "raw source": 1,
+        "UUID": 1
+      },
+      "strength": "raw source was not required; graph evidence and guardrails were available",
+      "limitation": "semantic node labels are still UUID-heavy/unknown, so source-level component names such as AuthService are not safely recoverable from artifacts alone yet"
+    }
+  },
+  "conservative_public_claim": "Initial fixture evidence suggests LynkMesh can provide deterministic, sanitized graph artifacts that let an AI reason about structure without raw source files, while preserving uncertainty guardrails. This is not benchmark proof and does not show that the AI is inherently smarter.",
+  "next_improvement": "Stage 4.7.0F — Human-readable node/edge labels for evidence index."
+}

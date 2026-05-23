@@ -1,0 +1,9 @@
+LynkMesh unknown (source checkout)
+  LynkMesh is a research preview / early validation. Not production-ready.
+  python                3.13.7   ok
+  import lynkmesh       ok
+  semantic.contracts    ok
+  PYTHONHASHSEED        0   ok
+  php bridge            available (PHP analysis enabled)
+  guarantees            no graph build, no file writes, no network, no LLM inference
+Result: ready

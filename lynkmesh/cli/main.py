@@ -197,6 +197,148 @@ def _run_pipeline(project_path: str):
     return pipeline.run(project_path, skip_cache_save=True)
 
 
+
+_LANGUAGE_BY_EXTENSION = {
+    ".php": "php",
+    ".py": "python",
+    ".js": "javascript",
+    ".jsx": "javascript",
+    ".ts": "typescript",
+    ".tsx": "typescript",
+    ".java": "java",
+    ".go": "go",
+    ".cs": "csharp",
+    ".rb": "ruby",
+    ".rs": "rust",
+}
+
+
+def _infer_language_mix_from_project_path(project_path: str) -> dict[str, int]:
+    """Infer a conservative language mix from source file extensions."""
+    root = Path(project_path)
+    mix: dict[str, int] = {}
+    if not root.exists() or not root.is_dir():
+        return mix
+
+    skip_dirs = {".git", "vendor", "node_modules", "__pycache__", ".pytest_cache"}
+    for file_path in root.rglob("*"):
+        if not file_path.is_file():
+            continue
+        if any(part in skip_dirs for part in file_path.parts):
+            continue
+        language = _LANGUAGE_BY_EXTENSION.get(file_path.suffix.lower())
+        if language:
+            mix[language] = mix.get(language, 0) + 1
+
+    return dict(sorted(mix.items()))
+
+
+def _primary_language_from_cli_mix(language_mix: dict[str, int]) -> str | None:
+    """Return the dominant language from a CLI-inferred language mix."""
+    if not language_mix:
+        return None
+    return sorted(language_mix.items(), key=lambda item: (-item[1], item[0]))[0][0]
+
+
+def _detect_entrypoints_from_project_path(project_path: str) -> list[dict]:
+    """Detect deterministic entrypoint candidates from conventional project paths."""
+    root = Path(project_path)
+    if not root.exists() or not root.is_dir():
+        return []
+
+    candidates: list[dict] = []
+    rules = (
+        ("public/index.php", "php_front_controller", "Conventional PHP front controller."),
+        ("routes/web.php", "php_routes_file", "Conventional PHP web routes file."),
+    )
+
+    for relative_path, kind, reason in rules:
+        if (root / relative_path).is_file():
+            candidates.append(
+                {
+                    "path": relative_path,
+                    "kind": kind,
+                    "confidence": "HEURISTIC",
+                    "evidence": "deterministic_path_candidate",
+                    "reason": reason,
+                }
+            )
+
+    return candidates
+
+_LANGUAGE_BY_EXTENSION = {
+    ".php": "php",
+    ".py": "python",
+    ".js": "javascript",
+    ".jsx": "javascript",
+    ".ts": "typescript",
+    ".tsx": "typescript",
+    ".java": "java",
+    ".go": "go",
+    ".cs": "csharp",
+    ".rb": "ruby",
+    ".rs": "rust",
+}
+
+
+def _iter_project_source_files(project_path: str):
+    """Yield source-like files from a project path without exposing absolute paths."""
+    root = Path(project_path)
+    skipped_dirs = {"vendor", "node_modules", ".git", "__pycache__", ".pytest_cache"}
+
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        if any(part in skipped_dirs for part in path.parts):
+            continue
+        yield path
+
+
+def _infer_languages_from_project_path(project_path: str) -> dict[str, int]:
+    """Infer a conservative deterministic language mix from file extensions."""
+    languages: dict[str, int] = {}
+
+    for path in _iter_project_source_files(project_path):
+        language = _LANGUAGE_BY_EXTENSION.get(path.suffix.lower())
+        if not language:
+            continue
+        languages[language] = languages.get(language, 0) + 1
+
+    return dict(sorted(languages.items()))
+
+
+def _primary_language_from_language_mix(languages: dict[str, int]) -> str | None:
+    """Pick the most common language deterministically."""
+    if not languages:
+        return None
+    return sorted(languages.items(), key=lambda item: (-item[1], item[0]))[0][0]
+
+
+def _entrypoints_from_project_path(project_path: str) -> list[dict[str, str]]:
+    """Infer deterministic entrypoint candidates from conventional project paths."""
+    root = Path(project_path)
+    candidates: list[dict[str, str]] = []
+
+    rules = (
+        ("public/index.php", "php_front_controller", "Conventional PHP front controller."),
+        ("routes/web.php", "php_routes_file", "Conventional PHP web routes file."),
+    )
+
+    for rel_path, kind, reason in rules:
+        if (root / Path(rel_path)).is_file():
+            candidates.append(
+                {
+                    "path": rel_path,
+                    "kind": kind,
+                    "confidence": "HEURISTIC",
+                    "evidence": "deterministic_path_candidate",
+                    "reason": reason,
+                }
+            )
+
+    return candidates
+
+
 def build_report_dict(project_path: str) -> dict:
     """Build a deterministic MeshContext Report dict for a local project path.
 
@@ -211,12 +353,16 @@ def build_report_dict(project_path: str) -> dict:
         raise RuntimeError("pipeline did not produce a serialized graph payload")
 
     display_name = Path(project_path).name or None
+    language_mix = _infer_language_mix_from_project_path(project_path)
     report = build_mesh_context_report(
         payload,
         project_display_name=display_name,
+        primary_language=_primary_language_from_cli_mix(language_mix),
+        languages=language_mix,
         pipeline_schema_version=getattr(run, "pipeline_schema_version", None),
         generator_version=_get_version(),
     )
+    report.entrypoints = _detect_entrypoints_from_project_path(project_path)
     return report.to_dict()
 
 
@@ -267,13 +413,38 @@ def cmd_report(args: argparse.Namespace) -> int:
 def build_pack_dict(project_path: str, profile: str = "compact") -> dict:
     """Build a deterministic MeshContext AI Context Pack dict for a project path.
 
-    Reuses the same public-safe report path as ``report`` and projects the AI
-    Context Pack from it. Contains no LLM inference and writes no files.
+    The report remains the public-safe aggregate source. For balanced/expanded
+    packs, the serialized graph payload is also supplied as a deterministic,
+    sanitized evidence source so node/edge evidence can be cited without raw
+    source files.
     """
-    from lynkmesh.semantic.contracts import build_mesh_context_ai_pack
+    from lynkmesh.semantic.contracts import (
+        build_mesh_context_ai_pack,
+        build_mesh_context_report,
+    )
 
-    report_dict = build_report_dict(project_path)
-    return build_mesh_context_ai_pack(report_dict, profile=profile)
+    run = _run_pipeline(project_path)
+    payload = getattr(run, "serialized_payload", None)
+    if not payload:
+        raise RuntimeError("pipeline did not produce a serialized graph payload")
+
+    display_name = Path(project_path).name or None
+    language_mix = _infer_languages_from_project_path(project_path)
+    report = build_mesh_context_report(
+        payload,
+        project_display_name=display_name,
+        primary_language=_primary_language_from_language_mix(language_mix),
+        languages=language_mix,
+        pipeline_schema_version=getattr(run, "pipeline_schema_version", None),
+        generator_version=_get_version(),
+    )
+    report.entrypoints = _entrypoints_from_project_path(project_path)
+
+    return build_mesh_context_ai_pack(
+        report.to_dict(),
+        profile=profile,
+        graph_source=payload,
+    )
 
 
 def cmd_pack(args: argparse.Namespace) -> int:
@@ -351,12 +522,16 @@ def build_benchmark_dict(project_path: str, profiles: Sequence[str]) -> dict:
         raise RuntimeError("pipeline did not produce a serialized graph payload")
 
     display_name = Path(project_path).name or None
+    language_mix = _infer_language_mix_from_project_path(project_path)
     report = build_mesh_context_report(
         payload,
         project_display_name=display_name,
+        primary_language=_primary_language_from_cli_mix(language_mix),
+        languages=language_mix,
         pipeline_schema_version=getattr(run, "pipeline_schema_version", None),
         generator_version=_get_version(),
     )
+    report.entrypoints = _detect_entrypoints_from_project_path(project_path)
     return build_mesh_context_token_benchmark(
         report.to_dict(),
         profiles=list(profiles),

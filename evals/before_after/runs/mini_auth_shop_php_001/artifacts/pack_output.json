@@ -1,0 +1,150 @@
+{
+  "ai_task_guide": {
+    "best_for": [
+      "architecture_overview",
+      "impact_analysis",
+      "risk_review",
+      "refactor_planning"
+    ],
+    "not_enough_for": [
+      "line_level_code_fix_without_source",
+      "business_rule_validation_without_domain_input"
+    ],
+    "recommended_response_style": "cite evidence IDs and avoid unsupported inference"
+  },
+  "architecture_context": {
+    "cross_cutting_candidates": [],
+    "data_access_candidates": [],
+    "dominant_components": [
+      {
+        "count": 34,
+        "type": "method"
+      },
+      {
+        "count": 15,
+        "type": "file"
+      },
+      {
+        "count": 12,
+        "type": "class"
+      },
+      {
+        "count": 0,
+        "type": "external"
+      },
+      {
+        "count": 0,
+        "type": "function"
+      }
+    ],
+    "entrypoint_candidates": [],
+    "service_candidates": []
+  },
+  "context_budget": {
+    "estimated_input_tokens": 691,
+    "estimated_output_tokens": 0,
+    "estimated_source_report_tokens": 722,
+    "estimated_token_reduction_percent": 4.29,
+    "estimator": "deterministic_char_heuristic_v0.1",
+    "profile": "compact"
+  },
+  "dependency_context": {
+    "important_external_dependencies": [],
+    "important_internal_dependencies": [],
+    "summary": {
+      "cross_layer_candidates": [],
+      "cycles_detected": 0,
+      "layer_edges": [],
+      "layers": []
+    }
+  },
+  "evidence_index": {
+    "edges": {},
+    "nodes": {},
+    "profile": "compact",
+    "sections": {
+      "architecture_context": {
+        "id": "section:architecture_context",
+        "kind": "section",
+        "reason": "high_signal_architecture_context"
+      },
+      "executive_context": {
+        "id": "section:executive_context",
+        "kind": "section",
+        "reason": "compact_project_summary"
+      },
+      "hotspot_context": {
+        "id": "section:hotspot_context",
+        "kind": "section",
+        "reason": "ranked_hotspot_candidates"
+      },
+      "risk_context": {
+        "id": "section:risk_context",
+        "kind": "section",
+        "reason": "ranked_risk_candidates"
+      }
+    }
+  },
+  "executive_context": {
+    "confidence_distribution": {
+      "EXACT": 0,
+      "EXTERNAL": 0,
+      "FRAMEWORK": 0,
+      "HEURISTIC": 0,
+      "PROPAGATED": 0,
+      "UNKNOWN": 0
+    },
+    "edge_count": 99,
+    "edge_type_breakdown": {},
+    "hotspots_count": 0,
+    "node_count": 61,
+    "node_type_breakdown": {
+      "class": 12,
+      "external": 0,
+      "file": 15,
+      "function": 0,
+      "method": 34
+    },
+    "risk_candidate_count": 0
+  },
+  "guardrails": {
+    "contains_llm_inference": false,
+    "deterministic_facts_only": true,
+    "do_not_assume_unseen_source_code": true,
+    "do_not_infer_business_logic_without_evidence": true,
+    "llm_interpretation_not_included": true,
+    "must_cite_evidence_ids": true
+  },
+  "hotspot_context": {
+    "included_count": 0,
+    "items": [],
+    "total_count": 0
+  },
+  "omissions": {
+    "omitted_sections": [
+      "raw_source_files",
+      "full_raw_node_listing",
+      "full_raw_edge_listing"
+    ],
+    "profile_limits_applied": true,
+    "reason": "compact profile selected",
+    "truncated_sections": []
+  },
+  "profile": "compact",
+  "project_identity": {
+    "build_id": "16e8358e-ae4e-4d62-893c-50f3323cd2ab",
+    "content_hash": "33047cf48b3a7b8bfe81447579e7404ba23ae8deb7a1ef111b03cf36753687fc",
+    "display_name": "mini_auth_shop_php",
+    "framework_hints": [],
+    "graph_id": "unknown",
+    "language_hints": []
+  },
+  "purpose": "ai_consumption",
+  "risk_context": {
+    "included_count": 0,
+    "items": [],
+    "total_count": 0
+  },
+  "schema_version": "mesh_context_ai_pack.v0.1",
+  "source_report_schema_version": "0.1.0"
+}

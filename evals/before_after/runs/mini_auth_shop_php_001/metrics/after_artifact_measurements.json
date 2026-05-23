@@ -1,0 +1,109 @@
+{
+  "schema_version": "stage_4_7_0c_artifact_measurements.v0.2",
+  "generated_at_utc": "2026-05-22T15:05:39.675525Z",
+  "run_id": "mini_auth_shop_php_001",
+  "is_benchmark_proof": false,
+  "source_artifacts": {
+    "doctor": "artifacts/doctor_output.txt",
+    "report": "artifacts/report_output.json",
+    "pack": "artifacts/pack_output.json",
+    "benchmark": "artifacts/benchmark_output.json"
+  },
+  "report": {
+    "schema_version": "0.1.0",
+    "report_type": "mesh_context_report",
+    "project": {
+      "display_name": "mini_auth_shop_php",
+      "languages": {
+        "php": 15
+      },
+      "primary_language": "php"
+    },
+    "languages": {
+      "mix": {
+        "php": 15
+      },
+      "primary": "php",
+      "supported": [
+        "php"
+      ]
+    },
+    "entrypoints_count": 2,
+    "entrypoints": [
+      {
+        "confidence": "HEURISTIC",
+        "evidence": "deterministic_path_candidate",
+        "kind": "php_front_controller",
+        "path": "public/index.php",
+        "reason": "Conventional PHP front controller."
+      },
+      {
+        "confidence": "HEURISTIC",
+        "evidence": "deterministic_path_candidate",
+        "kind": "php_routes_file",
+        "path": "routes/web.php",
+        "reason": "Conventional PHP web routes file."
+      }
+    ],
+    "graph_facts": {
+      "confidence_distribution": {
+        "EXACT": 0,
+        "EXTERNAL": 0,
+        "FRAMEWORK": 0,
+        "HEURISTIC": 0,
+        "PROPAGATED": 0,
+        "UNKNOWN": 0
+      },
+      "edge_count": 99,
+      "edge_type_breakdown": {},
+      "node_count": 61,
+      "node_type_breakdown": {
+        "class": 12,
+        "external": 0,
+        "file": 15,
+        "function": 0,
+        "method": 34
+      }
+    },
+    "risk_candidates_count": 0,
+    "hotspots_count": 0,
+    "limitations_count": 5
+  },
+  "pack": {
+    "schema_version": "mesh_context_ai_pack.v0.1",
+    "profile": "compact",
+    "context_budget": {
+      "estimated_input_tokens": 691,
+      "estimated_output_tokens": 0,
+      "estimated_source_report_tokens": 722,
+      "estimated_token_reduction_percent": 4.29,
+      "estimator": "deterministic_char_heuristic_v0.1",
+      "profile": "compact"
+    },
+    "evidence_index_count": 4,
+    "omissions_count": 4
+  },
+  "benchmark": {
+    "schema_version": "mesh_context_token_benchmark.v0.1",
+    "source_report_json_chars": 2885,
+    "source_report_tokens": 722,
+    "best_profile_by_tokens": "compact",
+    "max_token_reduction_percent": 4.29,
+    "profiles_count": 1
+  },
+  "guardrails": {
+    "contains_llm_inference_values": [
+      false,
+      false,
+      false
+    ],
+    "contains_llm_inference_all_false": true
+  },
+  "pending_manual_capture": [
+    "BEFORE AI transcript",
+    "AFTER AI transcript",
+    "screenshots",
+    "human correctness scoring",
+    "unsupported assumption count from actual model answers"
+  ]
+}
