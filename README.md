@@ -159,6 +159,12 @@ LynkMesh now includes a public-safe before/after evidence pack for reviewing how
 
 Use this pack to inspect what LynkMesh exposes to an AI agent: deterministic, sanitized graph evidence and context artifacts without raw private source code.
 
+## Positioning
+
+LynkMesh is a deterministic MeshContext evidence protocol for AI coding agents — not just a repository indexer.
+
+Read the public positioning note: [docs/positioning.md](docs/positioning.md).
+
 ## Current Language Support
 
 LynkMesh should be treated as language-layered:
