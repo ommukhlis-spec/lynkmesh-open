@@ -135,6 +135,7 @@ Expect breaking changes.
 
 LynkMesh is currently an early validation / research preview of a deterministic context protocol for AI-assisted code understanding. It is not production-ready.
 
+- [Try LynkMesh in 5 Minutes](docs/try_in_5_minutes.md) — the shortest public-safe onboarding path.
 - [The LynkMesh Protocol](docs/lynkmesh_protocol.md) — the problem, the deterministic pipeline, and the privacy model.
 - [Quickstart](docs/quickstart.md) — prerequisites, validation/smoke workflow, and high-level MCP usage.
 - [Case study template](docs/case_study_template.md) — a reusable, sanitized format for analysis examples.
