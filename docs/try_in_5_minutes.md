@@ -14,8 +14,8 @@ This is an early validation workflow, not benchmark proof.
 ## Step 1 — Clone and set up
 
 ```bash
-git clone https://github.com/ommukhlis-spec/lynkmesh.git
-cd lynkmesh
+git clone https://github.com/ommukhlis-spec/lynkmesh-open.git
+cd lynkmesh-open
 ```
 
 Set the deterministic hash seed (required by the pipeline):
