@@ -180,6 +180,6 @@ If any of these differ, treat the run as not healthy and re-check the build stat
 ## Related documentation
 
 - [The LynkMesh Protocol](lynkmesh_protocol.md)
-- [LynkMesh as an Agent Context Engine](agent_context_engine.md)
+- [Agent review workflow](agent_review_workflow.md)
 - [Case study template](case_study_template.md)
 - [MeshContext MCP release notes (v4.4.1)](mcp_mesh_context_release_notes_v4.4.1.md)
