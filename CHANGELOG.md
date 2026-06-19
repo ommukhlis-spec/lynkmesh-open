@@ -7,6 +7,10 @@ generated artifacts may change. This project is not production-ready.
 
 ## [Unreleased]
 
+No unreleased public-facing changes yet.
+
+## [v0.1.0-alpha] - 2026-06-19
+
 ### Added
 
 - Public alpha readiness documentation and onboarding flow.
