@@ -67,8 +67,8 @@ All artifacts are:
 ### Step 1 — Set up
 
 ```bash
-git clone https://github.com/ommukhlis-spec/lynkmesh.git
-cd lynkmesh
+git clone https://github.com/ommukhlis-spec/lynkmesh-open.git
+cd lynkmesh-open
 ```
 
 Set the deterministic hash seed:

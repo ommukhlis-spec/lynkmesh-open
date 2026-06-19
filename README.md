@@ -381,8 +381,8 @@ Packaging is still being stabilized.
 For now, use the repository from source:
 
 ```bash
-git clone https://github.com/ommukhlis-spec/lynkmesh.git
-cd lynkmesh
+git clone https://github.com/ommukhlis-spec/lynkmesh-open.git
+cd lynkmesh-open
 python -m pip install -U pip
 python -m pip install "mcp[cli]"
 ```
@@ -567,7 +567,7 @@ This workflow is a research preview / early validation. It is not production-rea
 python -m lynkmesh doctor
 python -m lynkmesh report /path/to/project --pretty > report.json
 python -m lynkmesh pack /path/to/project --profile compact --pretty > ai-pack.json
-python -m lynkmesh benchmark /path/to/project --profile compact --pretty > benchmark.json
+python -m lynkmesh benchmark /path/to/project --profiles compact --pretty > benchmark.json
 ```
 
 Windows:
@@ -576,7 +576,7 @@ Windows:
 python -m lynkmesh doctor
 python -m lynkmesh report "C:\path\to\project" --pretty > report.json
 python -m lynkmesh pack "C:\path\to\project" --profile compact --pretty > ai-pack.json
-python -m lynkmesh benchmark "C:\path\to\project" --profile compact --pretty > benchmark.json
+python -m lynkmesh benchmark "C:\path\to\project" --profiles compact --pretty > benchmark.json
 ```
 
 ### Artifact types
