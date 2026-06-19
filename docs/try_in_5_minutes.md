@@ -11,7 +11,7 @@ This is an early validation workflow, not benchmark proof.
 - Python 3.11+
 - Git
 
-## Step 1 — Clone and set up
+## Step 1 - Clone and set up
 
 ```bash
 git clone https://github.com/ommukhlis-spec/lynkmesh-open.git
@@ -35,7 +35,7 @@ set PYTHONHASHSEED=0
 $env:PYTHONHASHSEED = "0"
 ```
 
-## Step 2 — Verify the environment
+## Step 2 - Verify the environment
 
 ```bash
 python -m lynkmesh doctor
@@ -43,7 +43,7 @@ python -m lynkmesh doctor
 
 Expected: `Result: ready`.
 
-## Step 3 — Run the tests
+## Step 3 - Run the tests
 
 ```bash
 python -m pytest test/semantic/contracts test/unit/cli -q
@@ -51,9 +51,9 @@ python -m pytest test/semantic/contracts test/unit/cli -q
 
 Expected: 139+ passed.
 
-## Step 4 — Build a MeshContext AI Context Pack
+## Step 4 - Build a MeshContext AI Context Pack
 
-The included synthetic fixture is `evals/before_after/fixtures/mini_auth_shop_php` — a minimal PHP project with auth, products, routing, and middleware.
+The included synthetic fixture is `evals/before_after/fixtures/mini_auth_shop_php` - a minimal PHP project with auth, products, routing, and middleware.
 
 **Compact profile (default):**
 ```bash
@@ -67,7 +67,7 @@ python -m lynkmesh pack evals/before_after/fixtures/mini_auth_shop_php --profile
 
 Supported profiles: `compact`, `balanced`, `expanded`.
 
-## Step 5 — Run a token benchmark across all profiles
+## Step 5 - Run a token benchmark across all profiles
 
 ```bash
 python -m lynkmesh benchmark evals/before_after/fixtures/mini_auth_shop_php --profiles compact,balanced,expanded --pretty
@@ -84,7 +84,7 @@ Note: the `benchmark` command uses `--profiles` (plural, comma-separated), not `
 | 4 | `pack` | Builds a deterministic AI Context Pack from the synthetic fixture. |
 | 5 | `benchmark` | Builds a deterministic token estimate across all three profiles. |
 
-All commands are local-first: no network access, no LLM inference, no files written.
+The LynkMesh commands shown here are local-first: no network access and no LLM inference.
 
 ## Troubleshooting
 

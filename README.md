@@ -135,12 +135,24 @@ Expect breaking changes.
 
 LynkMesh is currently an early validation / research preview of a deterministic context protocol for AI-assisted code understanding. It is not production-ready.
 
+### New to LynkMesh? Start here
+
 - [Try LynkMesh in 5 Minutes](docs/try_in_5_minutes.md) — the shortest public-safe onboarding path.
+- [Demo script](docs/demo_script.md) — walk through the full demo story and inspect outputs.
+- [Support matrix](docs/support_matrix.md) — what is currently supported, experimental, or unsupported.
+- [Public FAQ](docs/public_faq.md) — answers to common questions from early users and reviewers.
+
+### Reference
+
 - [The LynkMesh Protocol](docs/lynkmesh_protocol.md) — the problem, the deterministic pipeline, and the privacy model.
 - [Quickstart](docs/quickstart.md) — prerequisites, validation/smoke workflow, and high-level MCP usage.
-- [Agent Context Engine](docs/agent_context_engine.md) — how LynkMesh can provide graph-backed context to AI agents and workflow platforms.
 - [Case study template](docs/case_study_template.md) — a reusable, sanitized format for analysis examples.
 - [MeshContext MCP release notes (v4.4.1)](docs/mcp_mesh_context_release_notes_v4.4.1.md) — current MCP capability metadata and guarantees.
+
+### AI agent workflows
+
+- [Agent review workflow](docs/agent_review_workflow.md) — target use case: AI-assisted code review with graph-backed context evidence.
+- [Public alpha criteria](docs/public_alpha_criteria.md) — criteria required before LynkMesh graduates from early alpha to public alpha / developer preview.
 
 ### Release status
 
@@ -166,14 +178,6 @@ Use this pack to inspect what LynkMesh exposes to an AI agent: deterministic, sa
 LynkMesh is a deterministic MeshContext evidence protocol for AI coding agents — not just a repository indexer.
 
 Read the public positioning note: [docs/positioning.md](docs/positioning.md).
-
-## Using LynkMesh as an Agent Context Engine
-
-LynkMesh can sit behind AI agents as a deterministic context provider. It can generate MeshContext Reports, AI Context Packs, and Token Benchmark artifacts that downstream agents can consume through the CLI, MCP, or future adapters.
-
-This makes LynkMesh useful for impact-aware review, architecture-aware retrieval, legacy onboarding, and context-efficient AI workflows.
-
-LynkMesh does not replace downstream platforms such as GitLab Orbit, GitHub, IDE assistants, or MCP clients. It enriches agents with graph-backed context and evidence. It does not make final judgments, does not perform LLM inference inside generated artifacts, and should not be treated as production-ready CI enforcement.
 
 ## Current Language Support
 
@@ -377,8 +381,8 @@ Packaging is still being stabilized.
 For now, use the repository from source:
 
 ```bash
-git clone https://github.com/ommukhlis-spec/lynkmesh-open.git
-cd lynkmesh-open
+git clone https://github.com/ommukhlis-spec/lynkmesh.git
+cd lynkmesh
 python -m pip install -U pip
 python -m pip install "mcp[cli]"
 ```
@@ -563,7 +567,7 @@ This workflow is a research preview / early validation. It is not production-rea
 python -m lynkmesh doctor
 python -m lynkmesh report /path/to/project --pretty > report.json
 python -m lynkmesh pack /path/to/project --profile compact --pretty > ai-pack.json
-python -m lynkmesh benchmark /path/to/project --profiles compact --pretty > benchmark.json
+python -m lynkmesh benchmark /path/to/project --profile compact --pretty > benchmark.json
 ```
 
 Windows:
@@ -572,7 +576,7 @@ Windows:
 python -m lynkmesh doctor
 python -m lynkmesh report "C:\path\to\project" --pretty > report.json
 python -m lynkmesh pack "C:\path\to\project" --profile compact --pretty > ai-pack.json
-python -m lynkmesh benchmark "C:\path\to\project" --profiles compact --pretty > benchmark.json
+python -m lynkmesh benchmark "C:\path\to\project" --profile compact --pretty > benchmark.json
 ```
 
 ### Artifact types
